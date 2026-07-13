@@ -29,34 +29,37 @@ FONT = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
 VOICE = "Samantha"          # clear en_US voice
 DATA_FORMAT = "LEI16@22050"  # 16-bit PCM, 22.05kHz mono WAV
 
-# letter, example word, phonic sound (spelled for TTS), tile colour (white text)
+# letter, spoken letter NAME, example word, phonic sound (spelled for TTS),
+# tile colour (white text).
+# The spoken name is spelled the way it sounds so `say` reads the letter name
+# ("bee", "see") and never the lone-capital reading ("Capital B").
 LETTERS = [
-    ("A", "Apple",     "ah",   "#E8563F"),
-    ("B", "Ball",      "buh",  "#3FA34D"),
-    ("C", "Cat",       "kuh",  "#4C8BF5"),
-    ("D", "Dog",       "duh",  "#E28413"),
-    ("E", "Elephant",  "eh",   "#9B59B6"),
-    ("F", "Fish",      "fuh",  "#1ABC9C"),
-    ("G", "Goat",      "guh",  "#E74C3C"),
-    ("H", "Hat",       "huh",  "#2E9E5B"),
-    ("I", "Igloo",     "ih",   "#3498DB"),
-    ("J", "Jug",       "juh",  "#E67E22"),
-    ("K", "Kite",      "kuh",  "#16A085"),
-    ("L", "Lion",      "luh",  "#D35400"),
-    ("M", "Monkey",    "muh",  "#8E44AD"),
-    ("N", "Nest",      "nuh",  "#27AE60"),
-    ("O", "Orange",    "oh",   "#E8912D"),
-    ("P", "Pig",       "puh",  "#C0392B"),
-    ("Q", "Queen",     "kwuh", "#2980B9"),
-    ("R", "Rabbit",    "ruh",  "#D6336C"),
-    ("S", "Sun",       "sss",  "#C99700"),
-    ("T", "Tree",      "tuh",  "#00A884"),
-    ("U", "Umbrella",  "uh",   "#6C5CE7"),
-    ("V", "Van",       "vuh",  "#D63031"),
-    ("W", "Watch",     "wuh",  "#0984E3"),
-    ("X", "Xylophone", "ks",   "#7C6CE0"),
-    ("Y", "Yak",       "yuh",  "#E0A020"),
-    ("Z", "Zebra",     "zzz",  "#566573"),
+    ("A", "ay",         "Apple",     "ah",   "#E8563F"),
+    ("B", "bee",        "Ball",      "buh",  "#3FA34D"),
+    ("C", "see",        "Cat",       "kuh",  "#4C8BF5"),
+    ("D", "dee",        "Dog",       "duh",  "#E28413"),
+    ("E", "ee",         "Elephant",  "eh",   "#9B59B6"),
+    ("F", "eff",        "Fish",      "fuh",  "#1ABC9C"),
+    ("G", "jee",        "Goat",      "guh",  "#E74C3C"),
+    ("H", "aitch",      "Hat",       "huh",  "#2E9E5B"),
+    ("I", "eye",        "Igloo",     "ih",   "#3498DB"),
+    ("J", "jay",        "Jug",       "juh",  "#E67E22"),
+    ("K", "kay",        "Kite",      "kuh",  "#16A085"),
+    ("L", "el",         "Lion",      "luh",  "#D35400"),
+    ("M", "em",         "Monkey",    "muh",  "#8E44AD"),
+    ("N", "en",         "Nest",      "nuh",  "#27AE60"),
+    ("O", "oh",         "Orange",    "oh",   "#E8912D"),
+    ("P", "pee",        "Pig",       "puh",  "#C0392B"),
+    ("Q", "cue",        "Queen",     "kwuh", "#2980B9"),
+    ("R", "ar",         "Rabbit",    "ruh",  "#D6336C"),
+    ("S", "ess",        "Sun",       "sss",  "#C99700"),
+    ("T", "tee",        "Tree",      "tuh",  "#00A884"),
+    ("U", "you",        "Umbrella",  "uh",   "#6C5CE7"),
+    ("V", "vee",        "Van",       "vuh",  "#D63031"),
+    ("W", "double you", "Watch",     "wuh",  "#0984E3"),
+    ("X", "ex",         "Xylophone", "ks",   "#7C6CE0"),
+    ("Y", "why",        "Yak",       "yuh",  "#E0A020"),
+    ("Z", "zee",        "Zebra",     "zzz",  "#566573"),
 ]
 
 # words that also appear as their own tappable pictures (reuse letter media)
@@ -94,7 +97,7 @@ def tile_png(letter: str, word: str, color: str, out: Path) -> None:
 
 def build_content() -> dict:
     letters = []
-    for letter, word, _sound, color in LETTERS:
+    for letter, _name, word, _sound, color in LETTERS:
         wk = word_key(word)
         letters.append({
             "id": letter,
@@ -108,7 +111,7 @@ def build_content() -> dict:
         })
 
     # index colours by word so pictures reuse the letter tile's colour
-    color_by_word = {word_key(w): c for _l, w, _s, c in LETTERS}
+    color_by_word = {word_key(w): c for _l, _n, w, _s, c in LETTERS}
     pictures = []
     for word in PICTURE_WORDS:
         wk = word_key(word)
@@ -129,8 +132,8 @@ def main() -> int:
     (ASSETS / "content.json").write_text(json.dumps(content, indent=2) + "\n")
     print(f"wrote {ASSETS/'content.json'}")
 
-    for letter, word, sound, color in LETTERS:
-        say_wav(letter, ASSETS / f"audio/letters/{letter}_name.wav")
+    for letter, name, word, sound, color in LETTERS:
+        say_wav(name, ASSETS / f"audio/letters/{letter}_name.wav")
         say_wav(sound, ASSETS / f"audio/letters/{letter}_sound.wav")
         wk = word_key(word)
         say_wav(word, ASSETS / f"audio/words/{wk}.wav")
