@@ -1,0 +1,9 @@
+[Unit]
+Description=Dyscover ABC over-the-air update
+Wants=network-online.target
+After=network-online.target
+# Runs independently of abc-kiosk so it can restart the kiosk mid-update.
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/abc-update.sh

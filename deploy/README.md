@@ -8,6 +8,10 @@ this is the concrete, tested recipe (what actually runs on the device).
 Files:
 - `abc-kiosk.service` goes to `/etc/systemd/system/abc-kiosk.service`
 - `asound.conf` goes to `/etc/asound.conf`
+- `abc-update.sh` goes to `/usr/local/bin/abc-update.sh` (the OTA updater)
+- `abc-update.service` / `abc-update.timer` go to `/etc/systemd/system/`
+- `abc-update.sudoers` goes to `/etc/sudoers.d/abc-update` (mode 0440)
+- `release.sh` runs on the dev machine to publish a GitHub release
 
 ## 1. Build the bundle (dev machine)
 
@@ -57,9 +61,66 @@ rsync -a --delete build/flutter-pi/pi4-64/ USER@PI:/opt/abc-app/
 ssh USER@PI sudo systemctl restart abc-kiosk
 ```
 
+## 4. Over-the-air updates (GitHub Releases)
+
+Once the Pi leaves your LAN you can no longer `rsync` over SSH. The updater lets
+the device pull new releases itself over outbound HTTPS (works behind NAT), on a
+timer and on demand from the app's **About** screen.
+
+How it works: each release publishes two assets with **stable names** so the
+`.../releases/latest/download/<asset>` URL is always the newest one:
+`dyscover-abc-pi4-64.tar.gz` (the bundle, with a `VERSION` file) and
+`version.json` (`{version, asset, sha256, notes}`). `abc-update.sh` compares the
+installed `VERSION` to the manifest, and if newer downloads the tarball, checks
+its SHA-256, swaps `/opt/abc-app` (keeping `.prev` for rollback) and restarts the
+kiosk. If the new build fails its health check it rolls back automatically.
+
+One-time install on the Pi:
+
+```bash
+sudo cp abc-update.sh /usr/local/bin/abc-update.sh
+sudo chmod +x /usr/local/bin/abc-update.sh
+sudo cp abc-update.service abc-update.timer /etc/systemd/system/
+sudo install -m 0440 abc-update.sudoers /etc/sudoers.d/abc-update   # About-screen button
+sudo systemctl daemon-reload
+sudo systemctl enable --now abc-update.timer
+# Stamp the currently-installed bundle so the first check has a baseline:
+echo "1.0.0" | sudo tee /opt/abc-app/VERSION
+```
+
+Manual controls:
+
+```bash
+abc-update.sh --check                 # print installed/latest, change nothing
+sudo systemctl start abc-update.service   # apply an update now (same as the app button)
+journalctl -u abc-update.service -n 50    # see what happened
+```
+
+Cutting a release (dev machine, needs `gh` logged in):
+
+```bash
+# 1. bump kAppVersion in lib/version.dart AND version: in pubspec.yaml, commit
+# 2. build + package + publish in one step:
+deploy/release.sh "What changed in this release"
+```
+
+Every enrolled Pi picks it up within the hour (or immediately via the About
+screen). Roll a release back by deleting it on GitHub or publishing a higher
+version; roll a single device back with its `/opt/abc-app.prev`.
+
+**Staying reachable for admin:** install [Tailscale](https://tailscale.com) on the
+Pi while you still have local SSH (`curl -fsSL https://tailscale.com/install.sh |
+sh && sudo tailscale up`). It gives SSH/`rsync` access from anywhere without port
+forwarding, so the OTA path handles routine app updates and Tailscale covers
+debugging and OS-level changes.
+
 ## Notes
 
 - The app runs as `abc-kiosk.service` on tty1 (`Conflicts=getty@tty1` hands it the
   console). It boots straight into the app, no login, no desktop.
 - With cloud-init disabled, boot-to-app is ~20s and a single clean start.
 - `Restart=always` relaunches the app if it ever exits.
+- The updater (`abc-update.service`) is a separate unit on purpose so it can
+  restart `abc-kiosk` mid-update without killing itself.
+- If you later add the overlayfs read-only lockdown, keep `/opt/abc-app` on a
+  writable partition or OTA cannot swap the bundle.

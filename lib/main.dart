@@ -4,12 +4,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:audioplayers/audioplayers.dart';
 
-/// Loaded once at startup and read by every screen.
-late final Content content;
+import 'updater.dart';
+import 'version.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+/// Loaded during the splash screen, then read by every screen.
+late final Content content;
+bool _contentReady = false;
+
+/// Loads [content] exactly once. Safe to call from the splash and from tests.
+Future<void> ensureContentLoaded() async {
+  if (_contentReady) return;
   content = await Content.load();
+  _contentReady = true;
+}
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Paint the splash immediately; content loads in the background so the
+  // first frame never waits on disk I/O (important on the Pi kiosk).
   runApp(const DyscoverApp());
 }
 
@@ -81,15 +93,134 @@ class Audio {
 
 // ---- UI ---------------------------------------------------------------------
 
+const Color kBackground = Color(0xFFFFF8EE);
+const Color kBrand = Color(0xFF4C8BF5);
+
 class DyscoverApp extends StatelessWidget {
   const DyscoverApp({super.key});
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Dyscover',
+        title: 'Dyscover ABC',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(scaffoldBackgroundColor: const Color(0xFFFFF8EE)),
-        home: const HomeScreen(),
+        theme: ThemeData(
+          useMaterial3: true,
+          scaffoldBackgroundColor: kBackground,
+          colorScheme: ColorScheme.fromSeed(seedColor: kBrand),
+        ),
+        home: const SplashScreen(),
+      );
+}
+
+/// Instant-paint splash: shows the brand while [Content.load] runs, then
+/// fades into the home screen. Never blocks the first frame.
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void initState() {
+    super.initState();
+    _boot();
+  }
+
+  Future<void> _boot() async {
+    await ensureContentLoaded();
+    if (!mounted) return;
+    await Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 450),
+        pageBuilder: (_, __, ___) => const HomeScreen(),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ScaleTransition(
+                scale: Tween(begin: 0.94, end: 1.06).animate(
+                  CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    _SplashBlock('A', Color(0xFFE8563F)),
+                    SizedBox(width: 16),
+                    _SplashBlock('B', Color(0xFF3FA34D)),
+                    SizedBox(width: 16),
+                    _SplashBlock('C', Color(0xFF4C8BF5)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 48),
+              const Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: 'Dyscover ',
+                        style: TextStyle(color: Colors.black87)),
+                    TextSpan(text: 'ABC', style: TextStyle(color: kBrand)),
+                  ],
+                ),
+                style: TextStyle(fontSize: 56, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 32),
+              const SizedBox(
+                width: 44,
+                height: 44,
+                child: CircularProgressIndicator(strokeWidth: 4),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class _SplashBlock extends StatelessWidget {
+  final String letter;
+  final Color color;
+  const _SplashBlock(this.letter, this.color);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 96,
+        height: 96,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: const [
+            BoxShadow(
+                blurRadius: 16, color: Colors.black26, offset: Offset(0, 6)),
+          ],
+        ),
+        child: Center(
+          child: Text(letter,
+              style: const TextStyle(
+                  fontSize: 60,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white)),
+        ),
       );
 }
 
@@ -98,42 +229,74 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        body: Center(
-          child: Row(
+        body: Stack(
+          children: [
+            Center(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _bigButton(context, '🔤', 'Letters',
-                  () => _go(context, const LettersScreen())),
-              const SizedBox(width: 40),
-              _bigButton(context, '🖼️', 'Pictures',
-                  () => _go(context, const PicturesScreen())),
+              const Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: 'Dyscover ',
+                        style: TextStyle(color: Colors.black87)),
+                    TextSpan(text: 'ABC', style: TextStyle(color: kBrand)),
+                  ],
+                ),
+                style: TextStyle(fontSize: 64, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 8),
+              Text('Tap to learn and play',
+                  style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black.withValues(alpha: 0.45))),
+              const SizedBox(height: 48),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _bigButton(context, Icons.sort_by_alpha_rounded, 'Letters',
+                      const Color(0xFFE8563F),
+                      () => _go(context, const LettersScreen())),
+                  const SizedBox(width: 40),
+                  _bigButton(context, Icons.photo_library_rounded, 'Pictures',
+                      const Color(0xFF4C8BF5),
+                      () => _go(context, const PicturesScreen())),
+                ],
+              ),
             ],
           ),
+            ),
+            // Subtle grown-up corner: version + updates + credits.
+            Positioned(
+              top: 12,
+              right: 12,
+              child: IconButton(
+                iconSize: 40,
+                color: Colors.black.withValues(alpha: 0.35),
+                icon: const Icon(Icons.info_outline_rounded),
+                onPressed: () => _go(context, const AboutScreen()),
+              ),
+            ),
+          ],
         ),
       );
 
   void _go(BuildContext c, Widget w) =>
       Navigator.push(c, MaterialPageRoute(builder: (_) => w));
 
-  Widget _bigButton(
-          BuildContext c, String emoji, String label, VoidCallback onTap) =>
-      GestureDetector(
+  Widget _bigButton(BuildContext c, IconData icon, String label, Color color,
+          VoidCallback onTap) =>
+      TapTile(
         onTap: onTap,
-        child: Container(
+        child: SizedBox(
           width: 320,
           height: 320,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: const [
-              BoxShadow(
-                  blurRadius: 24, color: Colors.black26, offset: Offset(0, 10)),
-            ],
-          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 120)),
+              Icon(icon, size: 140, color: color),
+              const SizedBox(height: 12),
               Text(label,
                   style: const TextStyle(
                       fontSize: 48, fontWeight: FontWeight.w800)),
@@ -144,15 +307,18 @@ class HomeScreen extends StatelessWidget {
 }
 
 /// A tile that scales up on press for immediate, tactile feedback.
+/// When [selected] it draws a white ring so the active choice stands out.
 class TapTile extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
   final Color color;
+  final bool selected;
   const TapTile({
     super.key,
     required this.child,
     required this.onTap,
     this.color = Colors.white,
+    this.selected = false,
   });
 
   @override
@@ -173,13 +339,20 @@ class _TapTileState extends State<TapTile> {
         child: AnimatedScale(
           scale: _scale,
           duration: const Duration(milliseconds: 120),
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
             decoration: BoxDecoration(
               color: widget.color,
               borderRadius: BorderRadius.circular(28),
-              boxShadow: const [
+              border: widget.selected
+                  ? Border.all(color: Colors.white, width: 6)
+                  : null,
+              boxShadow: [
                 BoxShadow(
-                    blurRadius: 20, color: Colors.black26, offset: Offset(0, 8)),
+                  blurRadius: widget.selected ? 30 : 20,
+                  color: widget.selected ? Colors.black38 : Colors.black26,
+                  offset: const Offset(0, 8),
+                ),
               ],
             ),
             child: Center(child: widget.child),
@@ -212,16 +385,19 @@ class _LettersScreenState extends State<LettersScreen> {
                 children: content.letters
                     .map((l) => TapTile(
                           color: l.color,
+                          selected: _stage?.id == l.id,
                           onTap: () {
                             setState(() => _stage = l);
                             Audio.sequence([l.nameAudio, l.soundAudio]);
                           },
-                          child: Text(
-                            l.label,
-                            style: const TextStyle(
-                                fontSize: 100,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white),
+                          child: FittedBox(
+                            child: Text(
+                              l.label,
+                              style: const TextStyle(
+                                  fontSize: 100,
+                                  fontWeight: FontWeight.w900,
+                                  color: Colors.white),
+                            ),
                           ),
                         ))
                     .toList(),
@@ -229,25 +405,48 @@ class _LettersScreenState extends State<LettersScreen> {
             ),
             if (_stage != null)
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                 child: GestureDetector(
                   onTap: () => Audio.play(_stage!.wordAudio),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_stage!.label,
-                          style: TextStyle(
-                              fontSize: 96,
-                              fontWeight: FontWeight.w900,
-                              color: _stage!.color)),
-                      const SizedBox(width: 24),
-                      if (_stage!.image.isNotEmpty)
-                        Image.asset('assets/${_stage!.image}', height: 140),
-                      const SizedBox(width: 24),
-                      Text(_stage!.exampleWord,
-                          style: const TextStyle(
-                              fontSize: 56, fontWeight: FontWeight.w800)),
-                    ],
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: const [
+                        BoxShadow(
+                            blurRadius: 20,
+                            color: Colors.black26,
+                            offset: Offset(0, 8)),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Both cases together helps early readers pair them.
+                        Text('${_stage!.label}${_stage!.label.toLowerCase()}',
+                            style: TextStyle(
+                                fontSize: 84,
+                                fontWeight: FontWeight.w900,
+                                color: _stage!.color)),
+                        const SizedBox(width: 24),
+                        if (_stage!.image.isNotEmpty)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.asset('assets/${_stage!.image}',
+                                height: 120),
+                          ),
+                        const SizedBox(width: 24),
+                        Text(_stage!.exampleWord,
+                            style: const TextStyle(
+                                fontSize: 52, fontWeight: FontWeight.w800)),
+                        const SizedBox(width: 20),
+                        Icon(Icons.volume_up_rounded,
+                            size: 44,
+                            color: Colors.black.withValues(alpha: 0.4)),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -273,7 +472,12 @@ class PicturesScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset('assets/${p.image}', height: 120),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child:
+                              Image.asset('assets/${p.image}', height: 120),
+                        ),
+                        const SizedBox(height: 8),
                         Text(p.label,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -290,15 +494,307 @@ class PicturesScreen extends StatelessWidget {
 PreferredSizeWidget _bar(BuildContext c, String title) => AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
+      centerTitle: true,
       leadingWidth: 96,
       leading: Padding(
         padding: const EdgeInsets.all(8),
         child: TapTile(
           onTap: () => Navigator.pop(c),
-          child: const Text('⬅', style: TextStyle(fontSize: 40)),
+          child: const Icon(Icons.arrow_back_rounded,
+              size: 44, color: Colors.black87),
         ),
       ),
       title: Text(title,
           style: const TextStyle(
               fontSize: 40, fontWeight: FontWeight.w800, color: Colors.black87)),
     );
+
+/// Grown-up screen: app identity, version, manual update check, and credits.
+class AboutScreen extends StatefulWidget {
+  const AboutScreen({super.key});
+
+  @override
+  State<AboutScreen> createState() => _AboutScreenState();
+}
+
+class _AboutScreenState extends State<AboutScreen> {
+  bool _checking = false;
+  bool _updating = false;
+  UpdateStatus? _status;
+
+  Future<void> _check() async {
+    setState(() {
+      _checking = true;
+      _status = null;
+    });
+    final s = await checkForUpdate();
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      _status = s;
+    });
+  }
+
+  Future<void> _update() async {
+    setState(() => _updating = true);
+    final err = await triggerUpdate();
+    if (!mounted) return;
+    // On success the kiosk service restarts and tears this app down, so we only
+    // land here again if it failed.
+    setState(() {
+      _updating = false;
+      if (err != null) _status = UpdateStatus(error: err);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: _bar(context, 'About'),
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      _SplashBlock('A', Color(0xFFE8563F)),
+                      SizedBox(width: 12),
+                      _SplashBlock('B', Color(0xFF3FA34D)),
+                      SizedBox(width: 12),
+                      _SplashBlock('C', Color(0xFF4C8BF5)),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  const Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: 'Dyscover ',
+                            style: TextStyle(color: Colors.black87)),
+                        TextSpan(text: 'ABC', style: TextStyle(color: kBrand)),
+                      ],
+                    ),
+                    style: TextStyle(fontSize: 48, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(kAppTagline,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black.withValues(alpha: 0.5))),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    children: const [
+                      _Chip('Version $kAppVersion'),
+                      _Chip('flutter-pi kiosk'),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                  _updateCard(),
+                  const SizedBox(height: 28),
+                  const _AboutLink(
+                    icon: Icons.science_rounded,
+                    color: kBrand,
+                    title: kLabName,
+                    subtitle: kLabAffiliation,
+                    url: kLabUrl,
+                  ),
+                  const SizedBox(height: 16),
+                  const _AboutLink(
+                    icon: Icons.code_rounded,
+                    color: Color(0xFF566573),
+                    title: 'Source code',
+                    subtitle: kGithubRepo,
+                    url: kGithubUrl,
+                  ),
+                  const SizedBox(height: 28),
+                  Text('© 2026 $kLabName',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.black.withValues(alpha: 0.4))),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget _updateCard() {
+    final s = _status;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+              blurRadius: 18, color: Colors.black12, offset: Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.system_update_rounded, size: 30, color: kBrand),
+              const SizedBox(width: 12),
+              const Text('Software updates',
+                  style:
+                      TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(_statusLine(),
+              style: TextStyle(
+                  fontSize: 18,
+                  color: s?.ok == false
+                      ? const Color(0xFFC0392B)
+                      : Colors.black.withValues(alpha: 0.6))),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: (_checking || _updating) ? null : _check,
+                style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 18)),
+                icon: _checking
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 3, color: Colors.white))
+                    : const Icon(Icons.refresh_rounded),
+                label: Text(_checking ? 'Checking…' : 'Check for updates',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700)),
+              ),
+              if (s != null && s.updateAvailable) ...[
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  onPressed: _updating ? null : _update,
+                  style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF3FA34D),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 18)),
+                  icon: _updating
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 3, color: Colors.white))
+                      : const Icon(Icons.download_rounded),
+                  label: Text(_updating ? 'Updating…' : 'Update now',
+                      style: const TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _statusLine() {
+    if (_updating) return 'Downloading and installing. The app will restart.';
+    final s = _status;
+    if (s == null) {
+      return 'You are on version $kAppVersion. Tap to check for a newer one.';
+    }
+    if (!s.ok) return s.error!;
+    if (s.updateAvailable) {
+      final notes = (s.notes?.isNotEmpty ?? false) ? '\n${s.notes}' : '';
+      return 'Update available: version ${s.latest}.$notes';
+    }
+    return 'You are up to date (version $kAppVersion).';
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String label;
+  const _Chip(this.label);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: kBrand.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(label,
+            style: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w700, color: kBrand)),
+      );
+}
+
+/// A credit row. The kiosk has no browser, so the URL is shown as text for a
+/// visitor to type or scan, not opened in-app.
+class _AboutLink extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title, subtitle, url;
+  const _AboutLink({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.url,
+  });
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+                blurRadius: 14, color: Colors.black12, offset: Offset(0, 4)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(icon, color: color, size: 30),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w800)),
+                  if (subtitle.isNotEmpty)
+                    Text(subtitle,
+                        style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.black.withValues(alpha: 0.55))),
+                  const SizedBox(height: 2),
+                  Text(url,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: color.withValues(alpha: 0.9))),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}

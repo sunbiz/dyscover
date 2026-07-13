@@ -1,0 +1,4 @@
+# Install to /etc/sudoers.d/abc-update  (owner root, mode 0440).
+# Lets the kiosk user apply an update from the About screen without a password.
+# Scope is limited to starting the updater unit; nothing else is granted.
+ubuntu ALL=(root) NOPASSWD: /usr/bin/systemctl start abc-update.service

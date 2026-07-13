@@ -4,6 +4,7 @@
 // not tap tiles, because tapping triggers audio playback which needs the
 // platform audio plugin (unavailable in the widget-test environment).
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dyscover/main.dart';
@@ -11,17 +12,25 @@ import 'package:dyscover/main.dart';
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    content = await Content.load();
+    await ensureContentLoaded();
   });
 
-  testWidgets('Home shows Letters and Pictures', (tester) async {
+  // The app opens on the splash, loads content, then fades to the home
+  // screen. Advance past that so tests start from home.
+  Future<void> pumpToHome(WidgetTester tester) async {
     await tester.pumpWidget(const DyscoverApp());
+    await tester.pump(); // run the load microtask -> pushReplacement
+    await tester.pump(const Duration(seconds: 1)); // finish the fade
+  }
+
+  testWidgets('Home shows Letters and Pictures', (tester) async {
+    await pumpToHome(tester);
     expect(find.text('Letters'), findsOneWidget);
     expect(find.text('Pictures'), findsOneWidget);
   });
 
   testWidgets('Letters screen shows a tile for every letter', (tester) async {
-    await tester.pumpWidget(const DyscoverApp());
+    await pumpToHome(tester);
     await tester.tap(find.text('Letters'));
     await tester.pumpAndSettle();
 
@@ -31,8 +40,19 @@ void main() {
     expect(find.text('A'), findsOneWidget);
   });
 
+  testWidgets('About screen shows version and credits', (tester) async {
+    await pumpToHome(tester);
+    await tester.tap(find.byIcon(Icons.info_outline_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Version 1.0.1'), findsOneWidget);
+    expect(find.text('Purkayastha Lab for Health Innovation'), findsOneWidget);
+    expect(find.text('Check for updates'), findsOneWidget);
+    expect(find.textContaining('github.com/sunbiz/dyscover'), findsOneWidget);
+  });
+
   testWidgets('Pictures screen renders the picture set', (tester) async {
-    await tester.pumpWidget(const DyscoverApp());
+    await pumpToHome(tester);
     await tester.tap(find.text('Pictures'));
     await tester.pumpAndSettle();
 
