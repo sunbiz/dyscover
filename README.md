@@ -38,10 +38,18 @@ documented end-to-end in
 In short, from the dev machine:
 
 ```bash
+# IMPORTANT: flutter-pi's prebuilt engine lags the newest Flutter stable.
+# Build with Flutter 3.41.x. Newer stables (3.44+) have no matching flutter-pi
+# engine yet, so flutterpi_tool reports "engine not yet available".
 flutter pub global activate flutterpi_tool
-flutterpi_tool build --arch=arm64 --cpu=pi4 --release
-rsync -a --delete ./build/flutter_assets/ USER@PI_HOST:/opt/abc-app/
+flutterpi_tool build --arch=arm64 --cpu=pi4 --release   # -> build/flutter-pi/pi4-64/
+rsync -a --delete ./build/flutter-pi/pi4-64/ USER@PI_HOST:/opt/abc-app/
+ssh USER@PI_HOST sudo systemctl restart abc-kiosk
 ```
+
+The Pi runs the app via a systemd service (`abc-kiosk`) on tty1 and boots
+straight into it (console default target, no desktop). Audio goes out HDMI via
+`/etc/asound.conf` pointing at the vc4hdmi card the panel is on.
 
 ## Content & media
 
