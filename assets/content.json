@@ -1,0 +1,338 @@
+{
+  "letters": [
+    {
+      "id": "A",
+      "label": "A",
+      "color": "#E8563F",
+      "example_word": "Apple",
+      "name_audio": "audio/letters/A_name.wav",
+      "sound_audio": "audio/letters/A_sound.wav",
+      "word_audio": "audio/words/apple.wav",
+      "image": "images/apple.png"
+    },
+    {
+      "id": "B",
+      "label": "B",
+      "color": "#3FA34D",
+      "example_word": "Ball",
+      "name_audio": "audio/letters/B_name.wav",
+      "sound_audio": "audio/letters/B_sound.wav",
+      "word_audio": "audio/words/ball.wav",
+      "image": "images/ball.png"
+    },
+    {
+      "id": "C",
+      "label": "C",
+      "color": "#4C8BF5",
+      "example_word": "Cat",
+      "name_audio": "audio/letters/C_name.wav",
+      "sound_audio": "audio/letters/C_sound.wav",
+      "word_audio": "audio/words/cat.wav",
+      "image": "images/cat.png"
+    },
+    {
+      "id": "D",
+      "label": "D",
+      "color": "#E28413",
+      "example_word": "Dog",
+      "name_audio": "audio/letters/D_name.wav",
+      "sound_audio": "audio/letters/D_sound.wav",
+      "word_audio": "audio/words/dog.wav",
+      "image": "images/dog.png"
+    },
+    {
+      "id": "E",
+      "label": "E",
+      "color": "#9B59B6",
+      "example_word": "Elephant",
+      "name_audio": "audio/letters/E_name.wav",
+      "sound_audio": "audio/letters/E_sound.wav",
+      "word_audio": "audio/words/elephant.wav",
+      "image": "images/elephant.png"
+    },
+    {
+      "id": "F",
+      "label": "F",
+      "color": "#1ABC9C",
+      "example_word": "Fish",
+      "name_audio": "audio/letters/F_name.wav",
+      "sound_audio": "audio/letters/F_sound.wav",
+      "word_audio": "audio/words/fish.wav",
+      "image": "images/fish.png"
+    },
+    {
+      "id": "G",
+      "label": "G",
+      "color": "#E74C3C",
+      "example_word": "Goat",
+      "name_audio": "audio/letters/G_name.wav",
+      "sound_audio": "audio/letters/G_sound.wav",
+      "word_audio": "audio/words/goat.wav",
+      "image": "images/goat.png"
+    },
+    {
+      "id": "H",
+      "label": "H",
+      "color": "#2E9E5B",
+      "example_word": "Hat",
+      "name_audio": "audio/letters/H_name.wav",
+      "sound_audio": "audio/letters/H_sound.wav",
+      "word_audio": "audio/words/hat.wav",
+      "image": "images/hat.png"
+    },
+    {
+      "id": "I",
+      "label": "I",
+      "color": "#3498DB",
+      "example_word": "Igloo",
+      "name_audio": "audio/letters/I_name.wav",
+      "sound_audio": "audio/letters/I_sound.wav",
+      "word_audio": "audio/words/igloo.wav",
+      "image": "images/igloo.png"
+    },
+    {
+      "id": "J",
+      "label": "J",
+      "color": "#E67E22",
+      "example_word": "Jug",
+      "name_audio": "audio/letters/J_name.wav",
+      "sound_audio": "audio/letters/J_sound.wav",
+      "word_audio": "audio/words/jug.wav",
+      "image": "images/jug.png"
+    },
+    {
+      "id": "K",
+      "label": "K",
+      "color": "#16A085",
+      "example_word": "Kite",
+      "name_audio": "audio/letters/K_name.wav",
+      "sound_audio": "audio/letters/K_sound.wav",
+      "word_audio": "audio/words/kite.wav",
+      "image": "images/kite.png"
+    },
+    {
+      "id": "L",
+      "label": "L",
+      "color": "#D35400",
+      "example_word": "Lion",
+      "name_audio": "audio/letters/L_name.wav",
+      "sound_audio": "audio/letters/L_sound.wav",
+      "word_audio": "audio/words/lion.wav",
+      "image": "images/lion.png"
+    },
+    {
+      "id": "M",
+      "label": "M",
+      "color": "#8E44AD",
+      "example_word": "Monkey",
+      "name_audio": "audio/letters/M_name.wav",
+      "sound_audio": "audio/letters/M_sound.wav",
+      "word_audio": "audio/words/monkey.wav",
+      "image": "images/monkey.png"
+    },
+    {
+      "id": "N",
+      "label": "N",
+      "color": "#27AE60",
+      "example_word": "Nest",
+      "name_audio": "audio/letters/N_name.wav",
+      "sound_audio": "audio/letters/N_sound.wav",
+      "word_audio": "audio/words/nest.wav",
+      "image": "images/nest.png"
+    },
+    {
+      "id": "O",
+      "label": "O",
+      "color": "#E8912D",
+      "example_word": "Orange",
+      "name_audio": "audio/letters/O_name.wav",
+      "sound_audio": "audio/letters/O_sound.wav",
+      "word_audio": "audio/words/orange.wav",
+      "image": "images/orange.png"
+    },
+    {
+      "id": "P",
+      "label": "P",
+      "color": "#C0392B",
+      "example_word": "Pig",
+      "name_audio": "audio/letters/P_name.wav",
+      "sound_audio": "audio/letters/P_sound.wav",
+      "word_audio": "audio/words/pig.wav",
+      "image": "images/pig.png"
+    },
+    {
+      "id": "Q",
+      "label": "Q",
+      "color": "#2980B9",
+      "example_word": "Queen",
+      "name_audio": "audio/letters/Q_name.wav",
+      "sound_audio": "audio/letters/Q_sound.wav",
+      "word_audio": "audio/words/queen.wav",
+      "image": "images/queen.png"
+    },
+    {
+      "id": "R",
+      "label": "R",
+      "color": "#D6336C",
+      "example_word": "Rabbit",
+      "name_audio": "audio/letters/R_name.wav",
+      "sound_audio": "audio/letters/R_sound.wav",
+      "word_audio": "audio/words/rabbit.wav",
+      "image": "images/rabbit.png"
+    },
+    {
+      "id": "S",
+      "label": "S",
+      "color": "#C99700",
+      "example_word": "Sun",
+      "name_audio": "audio/letters/S_name.wav",
+      "sound_audio": "audio/letters/S_sound.wav",
+      "word_audio": "audio/words/sun.wav",
+      "image": "images/sun.png"
+    },
+    {
+      "id": "T",
+      "label": "T",
+      "color": "#00A884",
+      "example_word": "Tree",
+      "name_audio": "audio/letters/T_name.wav",
+      "sound_audio": "audio/letters/T_sound.wav",
+      "word_audio": "audio/words/tree.wav",
+      "image": "images/tree.png"
+    },
+    {
+      "id": "U",
+      "label": "U",
+      "color": "#6C5CE7",
+      "example_word": "Umbrella",
+      "name_audio": "audio/letters/U_name.wav",
+      "sound_audio": "audio/letters/U_sound.wav",
+      "word_audio": "audio/words/umbrella.wav",
+      "image": "images/umbrella.png"
+    },
+    {
+      "id": "V",
+      "label": "V",
+      "color": "#D63031",
+      "example_word": "Van",
+      "name_audio": "audio/letters/V_name.wav",
+      "sound_audio": "audio/letters/V_sound.wav",
+      "word_audio": "audio/words/van.wav",
+      "image": "images/van.png"
+    },
+    {
+      "id": "W",
+      "label": "W",
+      "color": "#0984E3",
+      "example_word": "Watch",
+      "name_audio": "audio/letters/W_name.wav",
+      "sound_audio": "audio/letters/W_sound.wav",
+      "word_audio": "audio/words/watch.wav",
+      "image": "images/watch.png"
+    },
+    {
+      "id": "X",
+      "label": "X",
+      "color": "#7C6CE0",
+      "example_word": "Xylophone",
+      "name_audio": "audio/letters/X_name.wav",
+      "sound_audio": "audio/letters/X_sound.wav",
+      "word_audio": "audio/words/xylophone.wav",
+      "image": "images/xylophone.png"
+    },
+    {
+      "id": "Y",
+      "label": "Y",
+      "color": "#E0A020",
+      "example_word": "Yak",
+      "name_audio": "audio/letters/Y_name.wav",
+      "sound_audio": "audio/letters/Y_sound.wav",
+      "word_audio": "audio/words/yak.wav",
+      "image": "images/yak.png"
+    },
+    {
+      "id": "Z",
+      "label": "Z",
+      "color": "#566573",
+      "example_word": "Zebra",
+      "name_audio": "audio/letters/Z_name.wav",
+      "sound_audio": "audio/letters/Z_sound.wav",
+      "word_audio": "audio/words/zebra.wav",
+      "image": "images/zebra.png"
+    }
+  ],
+  "pictures": [
+    {
+      "id": "apple",
+      "label": "Apple",
+      "image": "images/apple.png",
+      "word_audio": "audio/words/apple.wav"
+    },
+    {
+      "id": "ball",
+      "label": "Ball",
+      "image": "images/ball.png",
+      "word_audio": "audio/words/ball.wav"
+    },
+    {
+      "id": "cat",
+      "label": "Cat",
+      "image": "images/cat.png",
+      "word_audio": "audio/words/cat.wav"
+    },
+    {
+      "id": "dog",
+      "label": "Dog",
+      "image": "images/dog.png",
+      "word_audio": "audio/words/dog.wav"
+    },
+    {
+      "id": "elephant",
+      "label": "Elephant",
+      "image": "images/elephant.png",
+      "word_audio": "audio/words/elephant.wav"
+    },
+    {
+      "id": "fish",
+      "label": "Fish",
+      "image": "images/fish.png",
+      "word_audio": "audio/words/fish.wav"
+    },
+    {
+      "id": "kite",
+      "label": "Kite",
+      "image": "images/kite.png",
+      "word_audio": "audio/words/kite.wav"
+    },
+    {
+      "id": "lion",
+      "label": "Lion",
+      "image": "images/lion.png",
+      "word_audio": "audio/words/lion.wav"
+    },
+    {
+      "id": "orange",
+      "label": "Orange",
+      "image": "images/orange.png",
+      "word_audio": "audio/words/orange.wav"
+    },
+    {
+      "id": "sun",
+      "label": "Sun",
+      "image": "images/sun.png",
+      "word_audio": "audio/words/sun.wav"
+    },
+    {
+      "id": "tree",
+      "label": "Tree",
+      "image": "images/tree.png",
+      "word_audio": "audio/words/tree.wav"
+    },
+    {
+      "id": "zebra",
+      "label": "Zebra",
+      "image": "images/zebra.png",
+      "word_audio": "audio/words/zebra.wav"
+    }
+  ]
+}

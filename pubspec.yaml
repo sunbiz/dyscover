@@ -1,0 +1,33 @@
+name: dyscover
+description: "ABC learning kiosk. A touch-first letters and pictures app for young learners, built to run natively on a Raspberry Pi via flutter-pi."
+publish_to: 'none'
+
+# App version (version+build). Bump on each release you ship to the Pi.
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Single reused player for letter names, phonic sounds and word clips.
+  # On the Pi (flutter-pi console mode) this drives gstreamer -> ALSA -> HDMI.
+  audioplayers: ^6.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # All learning content is data-driven from content.json + bundled media.
+  # Audio paths are relative to assets/ (audioplayers AssetSource prepends it).
+  assets:
+    - assets/content.json
+    - assets/audio/letters/
+    - assets/audio/words/
+    - assets/images/
