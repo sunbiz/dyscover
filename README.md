@@ -32,8 +32,8 @@ flutter analyze                  # lints
 
 ## Ship it to the Raspberry Pi
 
-The Pi kiosk build, systemd autostart, ALSA→HDMI audio and lockdown steps are
-documented end-to-end in
+The concrete, tested deploy recipe plus the systemd unit and ALSA config live in
+[`deploy/`](deploy/). The narrative background (why each step) is in
 [`abc_learning_app_flutterpi_plan.md`](abc_learning_app_flutterpi_plan.md).
 In short, from the dev machine:
 

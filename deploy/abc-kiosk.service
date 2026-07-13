@@ -1,0 +1,26 @@
+[Unit]
+Description=Dyscover ABC Flutter-Pi Kiosk
+After=systemd-user-sessions.service getty@tty1.service
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/abc-app
+# Brief settle so the tty1 VT is stable before flutter-pi grabs the display.
+# cloud-init is disabled on this Pi (networking is NetworkManager), so there is
+# no late console/VT activity to pause flutter-pi's DRM device on boot. If you
+# run this on an image where cloud-init IS active, disable it
+# (sudo touch /etc/cloud/cloud-init.disabled) or the app can fail to draw at
+# boot until the service is restarted.
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/local/bin/flutter-pi --release /opt/abc-app
+Restart=always
+RestartSec=2
+StandardInput=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+
+[Install]
+WantedBy=multi-user.target
