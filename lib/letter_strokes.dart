@@ -23,6 +23,67 @@ List<Offset> _arc(double cx, double cy, double rx, double ry, double startDeg,
   return pts;
 }
 
+/// Resamples [strokes] into a flat list of points spaced about [spacing] apart
+/// (normalized units), used as the "ideal path" for accuracy scoring and the
+/// progressive color fill (issue #3).
+List<Offset> sampleStrokes(List<List<Offset>> strokes, double spacing) {
+  final out = <Offset>[];
+  for (final st in strokes) {
+    if (st.isEmpty) continue;
+    out.add(st.first);
+    for (var i = 1; i < st.length; i++) {
+      final a = st[i - 1], b = st[i];
+      final d = (b - a).distance;
+      final n = math.max(1, (d / spacing).ceil());
+      for (var k = 1; k <= n; k++) {
+        out.add(Offset.lerp(a, b, k / n)!);
+      }
+    }
+  }
+  return out;
+}
+
+/// How closely a finger trace (normalized 0..1 points) followed the ideal
+/// stroke [samples]. Coverage is the fraction of the letter the finger passed
+/// over; precision is the fraction of finger points that stayed within the
+/// track. The combined [accuracy] (0..100) feeds the star feedback (issue #4).
+class TraceScore {
+  final List<bool> covered; // one flag per ideal sample
+  final double coverage; // 0..1
+  final double precision; // 0..1
+  final int accuracy; // 0..100
+
+  const TraceScore(this.covered, this.coverage, this.precision, this.accuracy);
+
+  static const TraceScore empty = TraceScore(<bool>[], 0, 0, 0);
+
+  static TraceScore of(
+      List<List<Offset>> childStrokes, List<Offset> samples, double tol) {
+    if (samples.isEmpty) return empty;
+    final covered = List<bool>.filled(samples.length, false);
+    final tol2 = tol * tol;
+    var total = 0, onTrack = 0;
+    for (final stroke in childStrokes) {
+      for (final pt in stroke) {
+        total++;
+        var near = false;
+        for (var i = 0; i < samples.length; i++) {
+          final dx = samples[i].dx - pt.dx, dy = samples[i].dy - pt.dy;
+          if (dx * dx + dy * dy <= tol2) {
+            covered[i] = true;
+            near = true;
+          }
+        }
+        if (near) onTrack++;
+      }
+    }
+    final cov = covered.where((b) => b).length / samples.length;
+    final prec = total == 0 ? 0.0 : onTrack / total;
+    final acc = ((0.6 * cov + 0.4 * prec) * 100).round().clamp(0, 100);
+    return TraceScore(covered, cov, prec, acc);
+  }
+}
+
 Map<String, List<List<Offset>>> _build() {
   Offset p(double x, double y) => Offset(x, y);
   return {

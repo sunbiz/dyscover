@@ -431,8 +431,9 @@ class TraceScreen extends StatefulWidget {
 
 class _TraceScreenState extends State<TraceScreen>
     with SingleTickerProviderStateMixin {
-  // Each entry is one continuous stroke (finger down until finger up). Keeping
-  // strokes separate stops multi-stroke letters (A, K, T...) from being joined
+  // Each entry is one continuous stroke (finger down until finger up), stored in
+  // normalized 0..1 coordinates so drawing, scoring and the guide share one
+  // space. Separate strokes stop multi-stroke letters (A, K, T...) being joined
   // by a stray line when the finger lifts and starts again.
   final List<List<Offset>> _strokes = [];
 
@@ -443,10 +444,17 @@ class _TraceScreenState extends State<TraceScreen>
   late final AnimationController _guideCtrl;
   bool _showMarker = false;
 
+  // Accuracy scoring + color fill (issue #3): the ideal path resampled into
+  // points, and the running score of the child's trace against it.
+  static const double _tol = 0.10; // how far off the track still counts (norm)
+  List<Offset> _samples = const [];
+  TraceScore _score = TraceScore.empty;
+
   @override
   void initState() {
     super.initState();
     _guide = kLetterStrokes[widget.letter.label];
+    _samples = _guide == null ? const [] : sampleStrokes(_guide!, 0.02);
     _guideCtrl = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 850 * (_guide?.length ?? 1)),
@@ -466,12 +474,28 @@ class _TraceScreenState extends State<TraceScreen>
   void _say() =>
       Audio.sequence([widget.letter.nameAudio, widget.letter.soundAudio]);
 
+  // Canvas point -> normalized, inverting the painter's guide mapping (which
+  // insets by 6% of the square side).
+  Offset _toNorm(Offset local, double side) {
+    final m = side * 0.06;
+    final span = side - 2 * m;
+    return Offset((local.dx - m) / span, (local.dy - m) / span);
+  }
+
+  void _rescore() => _score = TraceScore.of(_strokes, _samples, _tol);
+
   // The child touched the canvas: begin a stroke and step the demo aside so it
   // does not compete with their drawing.
   void _startStroke(Offset p) => setState(() {
         _strokes.add([p]);
         _showMarker = false;
         _guideCtrl.stop();
+        _rescore();
+      });
+
+  void _addPoint(Offset p) => setState(() {
+        _strokes.last.add(p);
+        _rescore();
       });
 
   // Replay the "show me how" animation over the current drawing.
@@ -484,7 +508,10 @@ class _TraceScreenState extends State<TraceScreen>
   }
 
   void _clear() {
-    setState(_strokes.clear);
+    setState(() {
+      _strokes.clear();
+      _score = TraceScore.empty;
+    });
     _showMe();
   }
 
@@ -518,15 +545,19 @@ class _TraceScreenState extends State<TraceScreen>
                     clipBehavior: Clip.antiAlias,
                     child: GestureDetector(
                       // Capture the finger path. The guide letterform, arrows,
-                      // stroke-order numbers and animated marker are painted.
+                      // stroke-order numbers, color fill and animated marker
+                      // are all painted.
                       behavior: HitTestBehavior.opaque,
-                      onPanStart: (d) => _startStroke(d.localPosition),
-                      onPanUpdate: (d) => setState(
-                          () => _strokes.last.add(d.localPosition)),
+                      onPanStart: (d) =>
+                          _startStroke(_toNorm(d.localPosition, side)),
+                      onPanUpdate: (d) =>
+                          _addPoint(_toNorm(d.localPosition, side)),
                       child: CustomPaint(
                         painter: _TracePainter(
                           childStrokes: _strokes,
                           guide: _guide,
+                          samples: _samples,
+                          covered: _score.covered,
                           color: l.color,
                           anim: _guideCtrl,
                           showMarker: _showMarker,
@@ -539,6 +570,7 @@ class _TraceScreenState extends State<TraceScreen>
               ),
             ),
           ),
+          if (_guide != null) _accuracyBar(l.color),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
             child: FittedBox(
@@ -576,6 +608,38 @@ class _TraceScreenState extends State<TraceScreen>
       ),
     );
   }
+
+  // Live accuracy of the current trace (issue #3): a bar that fills as the
+  // child covers the letter while staying on the track.
+  Widget _accuracyBar(Color color) => Padding(
+        padding: const EdgeInsets.fromLTRB(28, 0, 28, 10),
+        child: Row(
+          children: [
+            Icon(Icons.star_rounded,
+                size: 30, color: color.withValues(alpha: 0.85)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: LinearProgressIndicator(
+                  value: _score.accuracy / 100,
+                  minHeight: 18,
+                  backgroundColor: Colors.black.withValues(alpha: 0.08),
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 68,
+              child: Text('${_score.accuracy}%',
+                  textAlign: TextAlign.right,
+                  style:
+                      const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+            ),
+          ],
+        ),
+      );
 
   // Shows the letter pair and its example word; tap to hear the word spoken.
   Widget _wordCard(Letter l) => Padding(
@@ -653,8 +717,10 @@ class _TraceScreenState extends State<TraceScreen>
 /// numbers and direction arrows, the child's finger strokes on top, and (while
 /// the "show me" animation plays) a marker travelling the strokes in order.
 class _TracePainter extends CustomPainter {
-  final List<List<Offset>> childStrokes; // raw canvas coordinates
+  final List<List<Offset>> childStrokes; // normalized 0..1
   final List<List<Offset>>? guide; // normalized 0..1, null when unknown
+  final List<Offset> samples; // normalized ideal-path samples
+  final List<bool> covered; // which samples the finger has traced over
   final Color color;
   final Animation<double> anim; // 0..1 traversal across all guide strokes
   final bool showMarker;
@@ -662,6 +728,8 @@ class _TracePainter extends CustomPainter {
   _TracePainter({
     required this.childStrokes,
     required this.guide,
+    required this.samples,
+    required this.covered,
     required this.color,
     required this.anim,
     required this.showMarker,
@@ -691,13 +759,22 @@ class _TracePainter extends CustomPainter {
       canvas.drawPath(_poly(st), guidePaint);
     }
 
-    // 2) Direction arrowheads and stroke-order number badges.
+    // 2) Color fill: the track lights up in full color where the finger has
+    // traced over it (issue #3), so the letter "colors in" as it is drawn.
+    if (covered.length == samples.length) {
+      final fill = Paint()..color = color;
+      for (var i = 0; i < samples.length; i++) {
+        if (covered[i]) canvas.drawCircle(toCanvas(samples[i]), w / 2, fill);
+      }
+    }
+
+    // 3) Direction arrowheads and stroke-order number badges.
     for (var i = 0; i < guideCanvas.length; i++) {
       _arrowHead(canvas, guideCanvas[i], color.withValues(alpha: 0.55), s);
       _orderBadge(canvas, guideCanvas[i].first, i + 1, color, s);
     }
 
-    // 3) The child's finger strokes.
+    // 4) The child's finger strokes (their exact path, including any strays).
     final ink = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -707,14 +784,15 @@ class _TracePainter extends CustomPainter {
     final dot = Paint()..color = color;
     for (final st in childStrokes) {
       if (st.isEmpty) continue;
-      if (st.length == 1) {
-        canvas.drawCircle(st.first, w / 2, dot);
+      final pts = st.map(toCanvas).toList();
+      if (pts.length == 1) {
+        canvas.drawCircle(pts.first, w / 2, dot);
       } else {
-        canvas.drawPath(_poly(st), ink);
+        canvas.drawPath(_poly(pts), ink);
       }
     }
 
-    // 4) The travelling marker (only while the guide is playing).
+    // 5) The travelling marker (only while the guide is playing).
     if (showMarker && guideCanvas.isNotEmpty) {
       final pos = _markerAt(guideCanvas, anim.value);
       if (pos != null) _marker(canvas, pos, color, s);
