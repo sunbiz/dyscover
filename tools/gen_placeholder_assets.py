@@ -144,6 +144,18 @@ def main() -> int:
         tile_png(letter, word, color, ASSETS / f"images/{wk}.png")
         print(f"  {letter} -> name/sound + {wk}.wav + {wk}.png")
 
+    # Encouragement clips for the tracing star feedback (issue #4). Positive
+    # only; wording scales with the star count 1..5.
+    for key, spoken in [
+        ("nice", "Nice!"),
+        ("good", "Good!"),
+        ("very_good", "Very good!"),
+        ("excellent", "Excellent!"),
+        ("outstanding", "Outstanding!"),
+    ]:
+        say_wav(spoken, ASSETS / f"audio/feedback/{key}.wav")
+        print(f"  feedback -> {key}.wav")
+
     print("done.")
     return 0
 

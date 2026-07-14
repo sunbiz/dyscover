@@ -143,6 +143,52 @@ void main() {
     expect(clearColor().a, closeTo(1.0, 0.02));
   });
 
+  testWidgets('Finishing a trace shows stars and Try again / Next',
+      (tester) async {
+    muteAudio();
+    await pumpToHome(tester);
+    await tester.tap(find.text('Letters'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('A').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    final surface = find.byWidgetPredicate((w) =>
+        w is CustomPaint &&
+        w.painter.runtimeType.toString() == '_TracePainter');
+    // Draw something so Done is enabled.
+    final c = tester.getCenter(surface);
+    final g = await tester.startGesture(c - const Offset(80, 0));
+    for (var i = 0; i < 3; i++) {
+      await g.moveBy(const Offset(50, 0));
+    }
+    await g.up();
+    await tester.pump();
+
+    // Finish the attempt: stars, encouragement, and the Try again / Next choices.
+    await tester.tap(find.text('Done'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1)); // let the stars animate in
+    expect(find.text('Try again'), findsOneWidget);
+    expect(find.text('Next'), findsOneWidget);
+    expect(find.byIcon(Icons.star_rounded), findsWidgets); // >= 1 earned star
+    // The tracing controls are replaced by the results overlay.
+    expect(find.text('Show me'), findsNothing);
+
+    // Try again returns to drawing (guide loops again, so use pump()).
+    await tester.tap(find.text('Try again'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Try again'), findsNothing);
+    expect(find.text('Done'), findsOneWidget);
+
+    // Draw again so the looping guide is stopped when the test ends.
+    final g2 = await tester.startGesture(c);
+    await g2.moveBy(const Offset(30, 0));
+    await g2.up();
+    await tester.pump();
+  });
+
   testWidgets('Pictures screen renders the picture set', (tester) async {
     await pumpToHome(tester);
     await tester.tap(find.text('Pictures'));

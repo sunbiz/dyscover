@@ -32,4 +32,5 @@ flutter:
     - assets/content.json
     - assets/audio/letters/
     - assets/audio/words/
+    - assets/audio/feedback/
     - assets/images/

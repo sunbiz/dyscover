@@ -419,18 +419,22 @@ class LettersScreen extends StatelessWidget {
 /// example word (tap to hear it) and a "Hear it" button that replays the
 /// letter, so audio and touch stay together while tracing.
 ///
-/// Deliberately scoped: accuracy scoring (#3), an animated stroke guide (#2),
-/// and star/voice feedback (#4) arrive in later issues.
+/// Completing a letter (tracing most of it, or tapping Done) awards 1-5 stars
+/// with spoken encouragement (#4), then offers Try again / Next.
 class TraceScreen extends StatefulWidget {
   final Letter letter;
-  const TraceScreen(this.letter, {super.key});
+
+  /// When opened from "Next" (rather than the grid, which speaks the letter
+  /// before navigating), speak the letter on entry.
+  final bool speakOnOpen;
+  const TraceScreen(this.letter, {super.key, this.speakOnOpen = false});
 
   @override
   State<TraceScreen> createState() => _TraceScreenState();
 }
 
 class _TraceScreenState extends State<TraceScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   // Each entry is one continuous stroke (finger down until finger up), stored in
   // normalized 0..1 coordinates so drawing, scoring and the guide share one
   // space. Separate strokes stop multi-stroke letters (A, K, T...) being joined
@@ -450,6 +454,18 @@ class _TraceScreenState extends State<TraceScreen>
   List<Offset> _samples = const [];
   TraceScore _score = TraceScore.empty;
 
+  // Completion feedback (issue #4): 1-5 stars + spoken encouragement. Always
+  // positive; the wording scales with the star count.
+  late final AnimationController _starCtrl;
+  bool _completed = false;
+  int _stars = 0;
+  static const List<String> _words = [
+    'Nice', 'Good', 'Very good', 'Excellent', 'Outstanding'
+  ];
+  static const List<String> _files = [
+    'nice', 'good', 'very_good', 'excellent', 'outstanding'
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -459,15 +475,21 @@ class _TraceScreenState extends State<TraceScreen>
       vsync: this,
       duration: Duration(milliseconds: 850 * (_guide?.length ?? 1)),
     );
+    _starCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
     if (_guide != null) {
       _showMarker = true;
       _guideCtrl.repeat();
     }
+    if (widget.speakOnOpen) _say();
   }
 
   @override
   void dispose() {
     _guideCtrl.dispose();
+    _starCtrl.dispose();
     super.dispose();
   }
 
@@ -486,17 +508,23 @@ class _TraceScreenState extends State<TraceScreen>
 
   // The child touched the canvas: begin a stroke and step the demo aside so it
   // does not compete with their drawing.
-  void _startStroke(Offset p) => setState(() {
-        _strokes.add([p]);
-        _showMarker = false;
-        _guideCtrl.stop();
-        _rescore();
-      });
+  void _startStroke(Offset p) {
+    if (_completed) return;
+    setState(() {
+      _strokes.add([p]);
+      _showMarker = false;
+      _guideCtrl.stop();
+      _rescore();
+    });
+  }
 
-  void _addPoint(Offset p) => setState(() {
-        _strokes.last.add(p);
-        _rescore();
-      });
+  void _addPoint(Offset p) {
+    if (_completed) return;
+    setState(() {
+      _strokes.last.add(p);
+      _rescore();
+    });
+  }
 
   // Replay the "show me how" animation over the current drawing.
   void _showMe() {
@@ -515,6 +543,54 @@ class _TraceScreenState extends State<TraceScreen>
     _showMe();
   }
 
+  // Accuracy (0..100) -> 1..5 stars. Never zero: feedback stays positive.
+  int _starsFor(int accuracy) {
+    if (accuracy >= 85) return 5;
+    if (accuracy >= 70) return 4;
+    if (accuracy >= 55) return 3;
+    if (accuracy >= 40) return 2;
+    return 1;
+  }
+
+  // Finish the attempt: award stars and play the matching encouragement clip.
+  void _complete() {
+    if (_completed || _strokes.isEmpty) return;
+    final stars = _starsFor(_score.accuracy);
+    setState(() {
+      _completed = true;
+      _stars = stars;
+      _showMarker = false;
+    });
+    _guideCtrl.stop();
+    _starCtrl.forward(from: 0);
+    Audio.play('audio/feedback/${_files[stars - 1]}.wav');
+  }
+
+  // Finger lifted: if the letter is mostly traced, celebrate automatically.
+  void _onStrokeEnd() {
+    if (!_completed && _score.coverage >= 0.85) _complete();
+  }
+
+  void _tryAgain() {
+    setState(() {
+      _strokes.clear();
+      _score = TraceScore.empty;
+      _completed = false;
+      _stars = 0;
+    });
+    _showMe();
+  }
+
+  void _next() {
+    final letters = content.letters;
+    final i = letters.indexWhere((e) => e.id == widget.letter.id);
+    final next = letters[(i + 1) % letters.length];
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => TraceScreen(next, speakOnOpen: true)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = widget.letter;
@@ -529,81 +605,99 @@ class _TraceScreenState extends State<TraceScreen>
                 builder: (context, box) {
                   // A square writing surface, as large as the space allows.
                   final side = math.min(box.maxWidth, box.maxHeight) - 24;
-                  return Container(
+                  return SizedBox(
                     width: side,
                     height: side,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: const [
-                        BoxShadow(
-                            blurRadius: 24,
-                            color: Colors.black26,
-                            offset: Offset(0, 10)),
-                      ],
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: GestureDetector(
-                      // Capture the finger path. The guide letterform, arrows,
-                      // stroke-order numbers, color fill and animated marker
-                      // are all painted.
-                      behavior: HitTestBehavior.opaque,
-                      onPanStart: (d) =>
-                          _startStroke(_toNorm(d.localPosition, side)),
-                      onPanUpdate: (d) =>
-                          _addPoint(_toNorm(d.localPosition, side)),
-                      child: CustomPaint(
-                        painter: _TracePainter(
-                          childStrokes: _strokes,
-                          guide: _guide,
-                          samples: _samples,
-                          covered: _score.covered,
-                          color: l.color,
-                          anim: _guideCtrl,
-                          showMarker: _showMarker,
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(28),
+                              boxShadow: const [
+                                BoxShadow(
+                                    blurRadius: 24,
+                                    color: Colors.black26,
+                                    offset: Offset(0, 10)),
+                              ],
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: GestureDetector(
+                              // Capture the finger path. The guide letterform,
+                              // arrows, stroke numbers, color fill and marker
+                              // are all painted.
+                              behavior: HitTestBehavior.opaque,
+                              onPanStart: (d) =>
+                                  _startStroke(_toNorm(d.localPosition, side)),
+                              onPanUpdate: (d) =>
+                                  _addPoint(_toNorm(d.localPosition, side)),
+                              onPanEnd: (_) => _onStrokeEnd(),
+                              child: CustomPaint(
+                                painter: _TracePainter(
+                                  childStrokes: _strokes,
+                                  guide: _guide,
+                                  samples: _samples,
+                                  covered: _score.covered,
+                                  color: l.color,
+                                  anim: _guideCtrl,
+                                  showMarker: _showMarker,
+                                ),
+                                size: Size.infinite,
+                              ),
+                            ),
+                          ),
                         ),
-                        size: Size.infinite,
-                      ),
+                        if (_completed) Positioned.fill(child: _results(l)),
+                      ],
                     ),
                   );
                 },
               ),
             ),
           ),
-          if (_guide != null) _accuracyBar(l.color),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_guide != null) ...[
+          if (_guide != null && !_completed) _accuracyBar(l.color),
+          if (!_completed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_guide != null) ...[
+                      _controlButton(
+                        icon: Icons.auto_awesome_rounded,
+                        label: 'Show me',
+                        color: const Color(0xFF3FA34D),
+                        onTap: _showMe,
+                      ),
+                      const SizedBox(width: 16),
+                    ],
                     _controlButton(
-                      icon: Icons.auto_awesome_rounded,
-                      label: 'Show me',
-                      color: const Color(0xFF3FA34D),
-                      onTap: _showMe,
+                      icon: Icons.volume_up_rounded,
+                      label: 'Hear it',
+                      color: kBrand,
+                      onTap: _say,
                     ),
                     const SizedBox(width: 16),
+                    _controlButton(
+                      icon: Icons.refresh_rounded,
+                      label: 'Clear',
+                      color: const Color(0xFFE28413),
+                      onTap: _strokes.isEmpty ? null : _clear,
+                    ),
+                    const SizedBox(width: 16),
+                    _controlButton(
+                      icon: Icons.check_rounded,
+                      label: 'Done',
+                      color: const Color(0xFF00A884),
+                      onTap: _strokes.isEmpty ? null : _complete,
+                    ),
                   ],
-                  _controlButton(
-                    icon: Icons.volume_up_rounded,
-                    label: 'Hear it',
-                    color: kBrand,
-                    onTap: _say,
-                  ),
-                  const SizedBox(width: 16),
-                  _controlButton(
-                    icon: Icons.refresh_rounded,
-                    label: 'Clear',
-                    color: const Color(0xFFE28413),
-                    onTap: _strokes.isEmpty ? null : _clear,
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -638,6 +732,79 @@ class _TraceScreenState extends State<TraceScreen>
                       const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
             ),
           ],
+        ),
+      );
+
+  // Completion overlay (issue #4): animated stars, encouragement word, and the
+  // Try again / Next choices, over the finished (dimmed) letter.
+  Widget _results(Letter l) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.90),
+          borderRadius: BorderRadius.circular(28),
+        ),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FittedBox(fit: BoxFit.scaleDown, child: _starRow()),
+            const SizedBox(height: 10),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('${_words[_stars - 1]}!',
+                  style: TextStyle(
+                      fontSize: 46,
+                      fontWeight: FontWeight.w900,
+                      color: l.color)),
+            ),
+            const SizedBox(height: 22),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _controlButton(
+                    icon: Icons.refresh_rounded,
+                    label: 'Try again',
+                    color: const Color(0xFFE28413),
+                    onTap: _tryAgain,
+                  ),
+                  const SizedBox(width: 16),
+                  _controlButton(
+                    icon: Icons.arrow_forward_rounded,
+                    label: 'Next',
+                    color: const Color(0xFF3FA34D),
+                    onTap: _next,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+  // Five star slots; earned stars are gold and pop in with a staggered scale.
+  Widget _starRow() => AnimatedBuilder(
+        animation: _starCtrl,
+        builder: (_, __) => Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(5, (i) {
+            final earned = i < _stars;
+            final t = ((_starCtrl.value - i * 0.12) / 0.5).clamp(0.0, 1.0);
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: Transform.scale(
+                scale: earned ? Curves.easeOutBack.transform(t) : 1.0,
+                child: Icon(
+                  earned ? Icons.star_rounded : Icons.star_outline_rounded,
+                  size: 76,
+                  color: earned
+                      ? const Color(0xFFF5B301)
+                      : Colors.black.withValues(alpha: 0.16),
+                ),
+              ),
+            );
+          }),
         ),
       );
 
