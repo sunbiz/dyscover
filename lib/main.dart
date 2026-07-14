@@ -448,9 +448,9 @@ class _TraceScreenState extends State<TraceScreen>
   late final AnimationController _guideCtrl;
   bool _showMarker = false;
 
-  // Accuracy scoring + color fill (issue #3): the ideal path resampled into
-  // points, and the running score of the child's trace against it.
-  static const double _tol = 0.10; // how far off the track still counts (norm)
+  // Accuracy scoring + color fill (issue #3): the ideal path resampled per
+  // stroke (for scoring) and flattened (for the fill), plus the running score.
+  List<List<Offset>> _sampleGroups = const [];
   List<Offset> _samples = const [];
   TraceScore _score = TraceScore.empty;
 
@@ -470,7 +470,8 @@ class _TraceScreenState extends State<TraceScreen>
   void initState() {
     super.initState();
     _guide = kLetterStrokes[widget.letter.label];
-    _samples = _guide == null ? const [] : sampleStrokes(_guide!, 0.02);
+    _sampleGroups = _guide == null ? const [] : sampleLetter(_guide!, 0.02);
+    _samples = [for (final g in _sampleGroups) ...g];
     _guideCtrl = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: 850 * (_guide?.length ?? 1)),
@@ -504,7 +505,7 @@ class _TraceScreenState extends State<TraceScreen>
     return Offset((local.dx - m) / span, (local.dy - m) / span);
   }
 
-  void _rescore() => _score = TraceScore.of(_strokes, _samples, _tol);
+  void _rescore() => _score = TraceScore.of(_strokes, _sampleGroups);
 
   // The child touched the canvas: begin a stroke and step the demo aside so it
   // does not compete with their drawing.
@@ -543,12 +544,14 @@ class _TraceScreenState extends State<TraceScreen>
     _showMe();
   }
 
-  // Accuracy (0..100) -> 1..5 stars. Never zero: feedback stays positive.
+  // Accuracy (0..100) -> 1..5 stars. Never zero: feedback stays positive. Since
+  // accuracy is coverage*precision (per-stroke), 5 stars needs a genuinely
+  // accurate trace of every stroke; scribbles and skipped strokes score low.
   int _starsFor(int accuracy) {
-    if (accuracy >= 85) return 5;
-    if (accuracy >= 70) return 4;
-    if (accuracy >= 55) return 3;
-    if (accuracy >= 40) return 2;
+    if (accuracy >= 88) return 5;
+    if (accuracy >= 68) return 4;
+    if (accuracy >= 48) return 3;
+    if (accuracy >= 28) return 2;
     return 1;
   }
 
@@ -566,9 +569,13 @@ class _TraceScreenState extends State<TraceScreen>
     Audio.play('audio/feedback/${_files[stars - 1]}.wav');
   }
 
-  // Finger lifted: if the letter is mostly traced, celebrate automatically.
+  // Finger lifted: auto-celebrate only when the letter is both mostly traced
+  // and mostly on the line, so a sloppy or area-filling scribble does not
+  // finish itself with a high score.
   void _onStrokeEnd() {
-    if (!_completed && _score.coverage >= 0.85) _complete();
+    if (!_completed && _score.coverage >= 0.85 && _score.precision >= 0.6) {
+      _complete();
+    }
   }
 
   void _tryAgain() {

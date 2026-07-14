@@ -23,25 +23,25 @@ List<Offset> _arc(double cx, double cy, double rx, double ry, double startDeg,
   return pts;
 }
 
-/// Resamples [strokes] into a flat list of points spaced about [spacing] apart
-/// (normalized units), used as the "ideal path" for accuracy scoring and the
-/// progressive color fill (issue #3).
-List<Offset> sampleStrokes(List<List<Offset>> strokes, double spacing) {
-  final out = <Offset>[];
-  for (final st in strokes) {
-    if (st.isEmpty) continue;
-    out.add(st.first);
-    for (var i = 1; i < st.length; i++) {
-      final a = st[i - 1], b = st[i];
-      final d = (b - a).distance;
-      final n = math.max(1, (d / spacing).ceil());
-      for (var k = 1; k <= n; k++) {
-        out.add(Offset.lerp(a, b, k / n)!);
-      }
+List<Offset> _sampleOne(List<Offset> st, double spacing) {
+  final out = <Offset>[st.first];
+  for (var i = 1; i < st.length; i++) {
+    final a = st[i - 1], b = st[i];
+    final d = (b - a).distance;
+    final n = math.max(1, (d / spacing).ceil());
+    for (var k = 1; k <= n; k++) {
+      out.add(Offset.lerp(a, b, k / n)!);
     }
   }
   return out;
 }
+
+/// Resamples each stroke into its own dense point list (the "ideal path"),
+/// spaced about [spacing] apart (normalized). Kept per-stroke so coverage can
+/// weight every stroke equally: a short stroke (like A's crossbar) counts as
+/// much as a long one, so skipping it genuinely lowers the score.
+List<List<Offset>> sampleLetter(List<List<Offset>> strokes, double spacing) =>
+    [for (final st in strokes) if (st.isNotEmpty) _sampleOne(st, spacing)];
 
 /// How closely a finger trace (normalized 0..1 points) followed the ideal
 /// stroke [samples]. Coverage is the fraction of the letter the finger passed
@@ -57,29 +57,58 @@ class TraceScore {
 
   static const TraceScore empty = TraceScore(<bool>[], 0, 0, 0);
 
+  // A finger point marks COVERAGE for every ideal sample within [covTol] (did
+  // the child reach this part of the letter?), and counts toward PRECISION if
+  // its nearest sample is within [precTol] (did they stay on the line?).
+  //
+  // Coverage is averaged per stroke (each stroke weighted equally), so skipping
+  // a whole stroke tanks coverage even if it is short. Accuracy is the PRODUCT
+  // of coverage and precision, so neither filling the area (high coverage, low
+  // precision) nor drawing a couple of strokes perfectly (high precision, low
+  // coverage) can score high -- both must be good.
+  //
+  // [sampleGroups] is the ideal path per stroke; [covered] is returned flat in
+  // the same (concatenated) order for the color fill.
   static TraceScore of(
-      List<List<Offset>> childStrokes, List<Offset> samples, double tol) {
-    if (samples.isEmpty) return empty;
-    final covered = List<bool>.filled(samples.length, false);
-    final tol2 = tol * tol;
+    List<List<Offset>> childStrokes,
+    List<List<Offset>> sampleGroups, {
+    double covTol = 0.05,
+    double precTol = 0.06,
+  }) {
+    final flat = <Offset>[for (final g in sampleGroups) ...g];
+    if (flat.isEmpty) return empty;
+    final covered = List<bool>.filled(flat.length, false);
+    final covTol2 = covTol * covTol;
+    final precTol2 = precTol * precTol;
     var total = 0, onTrack = 0;
     for (final stroke in childStrokes) {
       for (final pt in stroke) {
         total++;
-        var near = false;
-        for (var i = 0; i < samples.length; i++) {
-          final dx = samples[i].dx - pt.dx, dy = samples[i].dy - pt.dy;
-          if (dx * dx + dy * dy <= tol2) {
-            covered[i] = true;
-            near = true;
-          }
+        var minD2 = double.infinity;
+        for (var i = 0; i < flat.length; i++) {
+          final dx = flat[i].dx - pt.dx, dy = flat[i].dy - pt.dy;
+          final d2 = dx * dx + dy * dy;
+          if (d2 <= covTol2) covered[i] = true;
+          if (d2 < minD2) minD2 = d2;
         }
-        if (near) onTrack++;
+        if (minD2 <= precTol2) onTrack++;
       }
     }
-    final cov = covered.where((b) => b).length / samples.length;
+    var idx = 0, groups = 0;
+    var covSum = 0.0;
+    for (final g in sampleGroups) {
+      if (g.isEmpty) continue;
+      var c = 0;
+      for (var j = 0; j < g.length; j++) {
+        if (covered[idx + j]) c++;
+      }
+      covSum += c / g.length;
+      groups++;
+      idx += g.length;
+    }
+    final cov = groups == 0 ? 0.0 : covSum / groups;
     final prec = total == 0 ? 0.0 : onTrack / total;
-    final acc = ((0.6 * cov + 0.4 * prec) * 100).round().clamp(0, 100);
+    final acc = (100 * cov * prec).round().clamp(0, 100);
     return TraceScore(covered, cov, prec, acc);
   }
 }
