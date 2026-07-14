@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- side rails (drawn first, behind bars) -->
+  <line x1="104" y1="120" x2="188" y2="392" stroke="#8D6E63" stroke-width="20" stroke-linecap="round"/>
+  <line x1="408" y1="120" x2="324" y2="392" stroke="#8D6E63" stroke-width="20" stroke-linecap="round"/>
+  <!-- bars: rainbow, shortening top to bottom -->
+  <rect x="106" y="103" width="300" height="34" rx="14" fill="#E74C3C"/>
+  <rect x="120" y="147" width="272" height="34" rx="14" fill="#E67E22"/>
+  <rect x="134" y="191" width="244" height="34" rx="14" fill="#F1C40F"/>
+  <rect x="148" y="235" width="216" height="34" rx="14" fill="#2ECC71"/>
+  <rect x="162" y="279" width="188" height="34" rx="14" fill="#3498DB"/>
+  <rect x="176" y="323" width="160" height="34" rx="14" fill="#6C5CE7"/>
+  <rect x="190" y="367" width="132" height="34" rx="14" fill="#9B59B6"/>
+  <!-- fixing nails on each bar end -->
+  <circle cx="122" cy="120" r="6" fill="#FFFFFF"/><circle cx="390" cy="120" r="6" fill="#FFFFFF"/>
+  <circle cx="206" cy="384" r="6" fill="#FFFFFF"/><circle cx="306" cy="384" r="6" fill="#FFFFFF"/>
+  <!-- mallets -->
+  <line x1="214" y1="150" x2="150" y2="440" stroke="#A1887F" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="214" cy="150" r="22" fill="#EC407A"/>
+  <line x1="322" y1="214" x2="404" y2="446" stroke="#A1887F" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="322" cy="214" r="22" fill="#26A69A"/>
+</svg>

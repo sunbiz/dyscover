@@ -5,7 +5,7 @@ publish_to: 'none'
 # App version (version+build). Bump on each release you ship to the Pi.
 # Keep the version in sync with kAppVersion in lib/version.dart; deploy/release.sh
 # reads lib/version.dart to tag the GitHub release the updater pulls from.
-version: 1.0.3+4
+version: 1.0.4+5
 
 environment:
   sdk: '>=3.4.0 <4.0.0'

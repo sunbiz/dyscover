@@ -391,13 +391,21 @@ class _LettersScreenState extends State<LettersScreen> {
                             setState(() => _stage = l);
                             Audio.sequence([l.nameAudio, l.soundAudio]);
                           },
-                          child: FittedBox(
-                            child: Text(
-                              l.label,
-                              style: const TextStyle(
-                                  fontSize: 100,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white),
+                          // Fill the tile: the letter scales up to the card,
+                          // leaving only a small margin.
+                          child: SizedBox.expand(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: FittedBox(
+                                fit: BoxFit.contain,
+                                child: Text(
+                                  l.label,
+                                  style: const TextStyle(
+                                      fontSize: 100,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white),
+                                ),
+                              ),
                             ),
                           ),
                         ))
@@ -428,20 +436,16 @@ class _LettersScreenState extends State<LettersScreen> {
                         // Both cases together helps early readers pair them.
                         Text('${_stage!.label}${_stage!.label.toLowerCase()}',
                             style: TextStyle(
-                                fontSize: 84,
+                                fontSize: 96,
                                 fontWeight: FontWeight.w900,
                                 color: _stage!.color)),
                         const SizedBox(width: 24),
                         if (_stage!.image.isNotEmpty)
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Image.asset('assets/${_stage!.image}',
-                                height: 120),
-                          ),
+                          Image.asset('assets/${_stage!.image}', height: 160),
                         const SizedBox(width: 24),
                         Text(_stage!.exampleWord,
                             style: const TextStyle(
-                                fontSize: 52, fontWeight: FontWeight.w800)),
+                                fontSize: 58, fontWeight: FontWeight.w800)),
                         const SizedBox(width: 20),
                         Icon(Icons.volume_up_rounded,
                             size: 44,
@@ -470,21 +474,26 @@ class PicturesScreen extends StatelessWidget {
           children: content.pictures
               .map((p) => TapTile(
                     onTap: () => Audio.play(p.wordAudio),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child:
-                              Image.asset('assets/${p.image}', height: 120),
+                    // Fill the card: the picture takes all the space above a
+                    // large label, leaving little whitespace.
+                    child: SizedBox.expand(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: Image.asset('assets/${p.image}',
+                                  fit: BoxFit.contain),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(p.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 40, fontWeight: FontWeight.w800)),
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(p.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 32, fontWeight: FontWeight.w800)),
-                      ],
+                      ),
                     ),
                   ))
               .toList(),

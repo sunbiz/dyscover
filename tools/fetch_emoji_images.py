@@ -45,11 +45,13 @@ EMOJI = {
     "umbrella": "2602",
     "van": "1f690",       # minibus
     "watch": "231a",
+    "yak": "1f402",       # ox (closest bovine; no yak emoji exists)
     "zebra": "1f993",
 }
 
-# No suitable emoji exists; keep the generated placeholder tile.
-NO_EMOJI = ["igloo", "xylophone", "yak"]
+# No emoji at all: these use hand-drawn SVGs in tools/custom/, rendered by
+# tools/render_custom_images.sh.
+NO_EMOJI = ["igloo", "xylophone"]
 
 
 def fetch(word: str, code: str) -> bool:
@@ -77,7 +79,8 @@ def main() -> int:
             bad.append(word)
             print(f"  {word:10s} FAILED (U+{code.upper()})")
     print(f"fetched {ok}/{len(EMOJI)} emoji images")
-    print(f"kept placeholder tiles for: {', '.join(NO_EMOJI)}")
+    print(f"custom SVG illustrations for: {', '.join(NO_EMOJI)} "
+          f"(run tools/render_custom_images.sh)")
     if bad:
         print(f"WARNING: failed: {', '.join(bad)}", file=sys.stderr)
         return 1

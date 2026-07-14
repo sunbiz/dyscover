@@ -45,7 +45,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.info_outline_rounded));
     await tester.pumpAndSettle();
 
-    expect(find.text('Version 1.0.3'), findsOneWidget);
+    expect(find.text('Version 1.0.4'), findsOneWidget);
     expect(find.text('Purkayastha Lab for Health Innovation'), findsOneWidget);
     expect(find.text('Check for updates'), findsOneWidget);
     expect(find.text('Exit to desktop'), findsOneWidget);
