@@ -1,0 +1,8 @@
+[Unit]
+Description=Switch from Dyscover ABC kiosk to the desktop (until next reboot)
+# Its own unit/cgroup so it survives stopping abc-kiosk (which is what tears the
+# triggering app down). The kiosk remains the boot default; reboot returns to it.
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/abc-desktop.sh

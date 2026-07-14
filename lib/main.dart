@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:audioplayers/audioplayers.dart';
 
+import 'device.dart';
 import 'updater.dart';
 import 'version.dart';
 
@@ -520,7 +521,30 @@ class AboutScreen extends StatefulWidget {
 class _AboutScreenState extends State<AboutScreen> {
   bool _checking = false;
   bool _updating = false;
+  bool _switching = false;
+  String? _deskError;
   UpdateStatus? _status;
+
+  Future<void> _exitToDesktop() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _PinPad(),
+    );
+    if (ok != true || !mounted) return;
+    setState(() {
+      _switching = true;
+      _deskError = null;
+    });
+    final err = await exitToDesktop();
+    // On success the kiosk service stops and this app is torn down, so we only
+    // get here again if it failed.
+    if (!mounted) return;
+    setState(() {
+      _switching = false;
+      _deskError = err;
+    });
+  }
 
   Future<void> _check() async {
     setState(() {
@@ -596,6 +620,8 @@ class _AboutScreenState extends State<AboutScreen> {
                   ),
                   const SizedBox(height: 28),
                   _updateCard(),
+                  const SizedBox(height: 20),
+                  _deviceCard(),
                   const SizedBox(height: 28),
                   const _AboutLink(
                     icon: Icons.science_rounded,
@@ -703,6 +729,67 @@ class _AboutScreenState extends State<AboutScreen> {
     );
   }
 
+  Widget _deviceCard() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: const [
+            BoxShadow(
+                blurRadius: 18, color: Colors.black12, offset: Offset(0, 6)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.desktop_windows_rounded, size: 30, color: kBrand),
+                SizedBox(width: 12),
+                Text('Device',
+                    style:
+                        TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _switching
+                  ? 'Switching to the desktop…'
+                  : _deskError ??
+                      'Leave the kiosk for the Raspberry Pi desktop (Wi-Fi, '
+                          'settings, files). Reboot to return to the kiosk.',
+              style: TextStyle(
+                  fontSize: 18,
+                  color: _deskError != null
+                      ? const Color(0xFFC0392B)
+                      : Colors.black.withValues(alpha: 0.6)),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: _switching ? null : _exitToDesktop,
+                style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE28413),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 18)),
+                icon: _switching
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 3, color: Colors.white))
+                    : const Icon(Icons.logout_rounded),
+                label: Text(_switching ? 'Please wait…' : 'Exit to desktop',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      );
+
   String _statusLine() {
     if (_updating) return 'Downloading and installing. The app will restart.';
     final s = _status;
@@ -796,5 +883,127 @@ class _AboutLink extends StatelessWidget {
             ),
           ],
         ),
+      );
+}
+
+/// On-screen numeric keypad for the grown-up PIN (the kiosk has no keyboard).
+/// Pops `true` when [kAdminPin] is entered, `false` on cancel.
+class _PinPad extends StatefulWidget {
+  const _PinPad();
+
+  @override
+  State<_PinPad> createState() => _PinPadState();
+}
+
+class _PinPadState extends State<_PinPad> {
+  String _entered = '';
+  bool _error = false;
+
+  void _tap(String d) {
+    if (_entered.length >= kAdminPin.length) return;
+    setState(() {
+      _error = false;
+      _entered += d;
+    });
+    if (_entered.length == kAdminPin.length) {
+      if (_entered == kAdminPin) {
+        Navigator.of(context).pop(true);
+      } else {
+        setState(() {
+          _error = true;
+          _entered = '';
+        });
+      }
+    }
+  }
+
+  void _back() {
+    if (_entered.isEmpty) return;
+    setState(() {
+      _error = false;
+      _entered = _entered.substring(0, _entered.length - 1);
+    });
+  }
+
+  Widget _key(String label, VoidCallback onTap, {IconData? icon}) => Padding(
+        padding: const EdgeInsets.all(4),
+        child: SizedBox(
+          width: 84,
+          height: 68,
+          child: OutlinedButton(
+            onPressed: onTap,
+            style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16))),
+            child: icon != null
+                ? Icon(icon, size: 26)
+                : Text(label,
+                    style: const TextStyle(
+                        fontSize: 30, fontWeight: FontWeight.w800)),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Enter grown-up PIN', textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(kAdminPin.length, (i) {
+                final filled = i < _entered.length;
+                return Container(
+                  width: 18,
+                  height: 18,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: filled ? kBrand : Colors.transparent,
+                    border: Border.all(
+                        color: _error ? const Color(0xFFC0392B) : kBrand,
+                        width: 2),
+                  ),
+                );
+              }),
+            ),
+            SizedBox(
+              height: 26,
+              child: Center(
+                child: _error
+                    ? const Text('Wrong PIN, try again',
+                        style: TextStyle(color: Color(0xFFC0392B)))
+                    : const SizedBox.shrink(),
+              ),
+            ),
+            for (final row in const [
+              ['1', '2', '3'],
+              ['4', '5', '6'],
+              ['7', '8', '9'],
+            ])
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [for (final d in row) _key(d, () => _tap(d))],
+              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(width: 92),
+                _key('0', () => _tap('0')),
+                _key('', _back, icon: Icons.backspace_outlined),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel', style: TextStyle(fontSize: 18)),
+          ),
+        ],
       );
 }

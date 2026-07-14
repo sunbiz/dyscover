@@ -45,10 +45,28 @@ void main() {
     await tester.tap(find.byIcon(Icons.info_outline_rounded));
     await tester.pumpAndSettle();
 
-    expect(find.text('Version 1.0.1'), findsOneWidget);
+    expect(find.text('Version 1.0.2'), findsOneWidget);
     expect(find.text('Purkayastha Lab for Health Innovation'), findsOneWidget);
     expect(find.text('Check for updates'), findsOneWidget);
+    expect(find.text('Exit to desktop'), findsOneWidget);
     expect(find.textContaining('github.com/sunbiz/dyscover'), findsOneWidget);
+  });
+
+  testWidgets('Exit to desktop is gated by a PIN pad', (tester) async {
+    await pumpToHome(tester);
+    await tester.tap(find.byIcon(Icons.info_outline_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Exit to desktop'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Exit to desktop'));
+    await tester.pumpAndSettle();
+    // The touch PIN pad appears instead of switching immediately.
+    expect(find.text('Enter grown-up PIN'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter grown-up PIN'), findsNothing);
   });
 
   testWidgets('Pictures screen renders the picture set', (tester) async {

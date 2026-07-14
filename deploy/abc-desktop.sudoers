@@ -1,0 +1,4 @@
+# Install to /etc/sudoers.d/abc-desktop  (owner root, mode 0440).
+# Lets the kiosk user leave for the desktop from the (PIN-gated) About screen.
+# Scope is limited to starting that one unit; nothing else is granted.
+ubuntu ALL=(root) NOPASSWD: /usr/bin/systemctl --no-block start abc-desktop.service

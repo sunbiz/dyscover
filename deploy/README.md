@@ -11,6 +11,9 @@ Files:
 - `abc-update.sh` goes to `/usr/local/bin/abc-update.sh` (the OTA updater)
 - `abc-update.service` / `abc-update.timer` go to `/etc/systemd/system/`
 - `abc-update.sudoers` goes to `/etc/sudoers.d/abc-update` (mode 0440)
+- `abc-desktop.sh` goes to `/usr/local/bin/abc-desktop.sh` (exit-to-desktop)
+- `abc-desktop.service` goes to `/etc/systemd/system/`
+- `abc-desktop.sudoers` goes to `/etc/sudoers.d/abc-desktop` (mode 0440)
 - `release.sh` runs on the dev machine to publish a GitHub release
 
 ## 1. Build the bundle (dev machine)
@@ -113,6 +116,30 @@ Pi while you still have local SSH (`curl -fsSL https://tailscale.com/install.sh 
 sh && sudo tailscale up`). It gives SSH/`rsync` access from anywhere without port
 forwarding, so the OTA path handles routine app updates and Tailscale covers
 debugging and OS-level changes.
+
+## 5. Exit to desktop (from the kiosk)
+
+The Raspberry Pi desktop (labwc + LXDE, `lightdm` with `autologin-user=ubuntu`)
+is still installed; kiosk mode just boots to `multi-user.target` instead of
+`graphical.target`. The About screen has a PIN-gated **Exit to desktop** button
+so an adult can reach the desktop on-site (Wi-Fi, settings, files) without SSH.
+
+It is deliberately one-way: the kiosk stays the boot default, so **rebooting is
+the way back** (self-recovering, nothing to get stuck in). The button starts
+`abc-desktop.service`, which stops `abc-kiosk` and starts `lightdm`.
+
+One-time install on the Pi:
+
+```bash
+sudo cp abc-desktop.sh /usr/local/bin/abc-desktop.sh
+sudo chmod +x /usr/local/bin/abc-desktop.sh
+sudo cp abc-desktop.service /etc/systemd/system/
+sudo install -m 0440 abc-desktop.sudoers /etc/sudoers.d/abc-desktop
+sudo systemctl daemon-reload
+```
+
+Change the PIN in `lib/version.dart` (`kAdminPin`). Test the switch itself with
+`sudo systemctl --no-block start abc-desktop.service`; return with `sudo reboot`.
 
 ## Notes
 
