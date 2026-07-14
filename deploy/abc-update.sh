@@ -20,8 +20,17 @@ BASE_URL="${ABC_BASE_URL:-https://github.com/${REPO}/releases/latest/download}"
 RESTART_CMD="${ABC_RESTART_CMD:-systemctl restart abc-kiosk}"
 HEALTH_CMD="${ABC_HEALTH_CMD:-systemctl is-active --quiet abc-kiosk}"
 ASSET_DEFAULT="dyscover-abc-pi4-64.tar.gz"
+# If the app lives on a normally-read-only data mount (see deploy/readonly/),
+# set this to that mount point; the updater flips it rw only for the swap and
+# back to ro afterward. Empty (default) means the app dir is already writable.
+DATA_MOUNT="${ABC_DATA_MOUNT:-}"
 
 log() { echo "[abc-update] $*"; }
+
+remount_rw() { [ -n "$DATA_MOUNT" ] && mount -o remount,rw "$DATA_MOUNT"; }
+remount_ro() {
+  [ -n "$DATA_MOUNT" ] && mount -o remount,ro "$DATA_MOUNT" 2>/dev/null || true
+}
 
 # Minimal JSON string-field reader (avoids a jq dependency on the Pi).
 json_field() { # $1=field  $2=file
@@ -38,7 +47,7 @@ roll_back() { # $1=previous dir
 }
 
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"; remount_ro' EXIT
 
 CHECK_ONLY=0
 [ "${1:-}" = "--check" ] && CHECK_ONLY=1
@@ -84,6 +93,7 @@ fi
 
 NEW="${APP_DIR}.new"
 PREV="${APP_DIR}.prev"
+remount_rw   # writable only for the swap; the EXIT trap restores read-only
 rm -rf "$NEW"
 mkdir -p "$NEW"
 tar -xzf "${TMP}/bundle.tar.gz" -C "$NEW"
@@ -93,6 +103,7 @@ echo "$LATEST" > "${NEW}/VERSION"
 rm -rf "$PREV"
 [ -e "$APP_DIR" ] && mv "$APP_DIR" "$PREV"
 mv "$NEW" "$APP_DIR"
+sync   # force the swap out to the card before anything can reboot
 
 log "restarting kiosk"
 eval "$RESTART_CMD" || { roll_back "$PREV"; exit 1; }
