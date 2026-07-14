@@ -87,7 +87,8 @@ void main() {
     expect(find.text('Enter grown-up PIN'), findsNothing);
   });
 
-  testWidgets('Tapping a letter opens the trace canvas and captures a stroke',
+  testWidgets(
+      'Tapping a letter opens the trace canvas with a guide and captures a stroke',
       (tester) async {
     muteAudio();
     await pumpToHome(tester);
@@ -96,39 +97,50 @@ void main() {
 
     // Tapping a letter speaks it and opens the tracing canvas directly.
     await tester.tap(find.text('A').first);
-    await tester.pumpAndSettle();
+    // The stroke guide loops, so advance with pump(); pumpAndSettle would hang.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     expect(find.text('Trace A'), findsOneWidget);
     expect(find.text('Clear'), findsOneWidget);
-    // The letter can be replayed, and the example word is shown to hear too.
     expect(find.text('Hear it'), findsOneWidget);
+    // The animated stroke guide adds a "Show me" replay control.
+    expect(find.text('Show me'), findsOneWidget);
+    // The example word is shown and hearable in the trace screen.
     expect(find.text('Apple'), findsOneWidget);
 
-    // The Clear button starts disabled (dimmed) because nothing is drawn yet.
     Color clearColor() => tester
-        .widget<TapTile>(
-            find.ancestor(of: find.text('Clear'), matching: find.byType(TapTile)))
+        .widget<TapTile>(find.ancestor(
+            of: find.text('Clear'), matching: find.byType(TapTile)))
         .color;
-    expect(clearColor().a, closeTo(0.35, 0.02));
+    expect(clearColor().a, closeTo(0.35, 0.02)); // disabled before drawing
 
-    // Drag a finger across the writing surface.
     final surface = find.byWidgetPredicate((w) =>
-        w is CustomPaint && w.painter.runtimeType.toString() == '_TracePainter');
+        w is CustomPaint &&
+        w.painter.runtimeType.toString() == '_TracePainter');
     expect(surface, findsOneWidget);
-    final center = tester.getCenter(surface);
-    final gesture = await tester.startGesture(center - const Offset(90, 0));
-    for (var i = 0; i < 3; i++) {
-      await gesture.moveBy(const Offset(60, 0));
-    }
-    await gesture.up();
-    await tester.pumpAndSettle();
 
-    // A stroke was captured, so Clear is now enabled (full opacity).
+    Future<void> drawStroke() async {
+      final c = tester.getCenter(surface);
+      final g = await tester.startGesture(c - const Offset(90, 0));
+      for (var i = 0; i < 3; i++) {
+        await g.moveBy(const Offset(60, 0));
+      }
+      await g.up();
+      await tester.pump();
+    }
+
+    await drawStroke(); // drawing captures a stroke and stops the guide loop
     expect(clearColor().a, closeTo(1.0, 0.02));
 
-    // Clearing empties the canvas and disables the button again.
+    // Clear empties the canvas (and replays the guide).
     await tester.tap(find.text('Clear'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(clearColor().a, closeTo(0.35, 0.02));
+
+    // End with the guide stopped so no looping ticker outlives the test.
+    await drawStroke();
+    expect(clearColor().a, closeTo(1.0, 0.02));
   });
 
   testWidgets('Pictures screen renders the picture set', (tester) async {
