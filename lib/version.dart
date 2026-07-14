@@ -8,7 +8,7 @@ library;
 
 const String kAppName = 'Dyscover ABC';
 const String kAppTagline = 'A touch-first ABC kiosk for young learners';
-const String kAppVersion = '1.0.2';
+const String kAppVersion = '1.0.3';
 
 /// PIN that gates grown-up actions (like leaving the kiosk for the desktop) so
 /// a child cannot trigger them by accident. Change this to your own code.

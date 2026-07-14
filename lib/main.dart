@@ -644,6 +644,12 @@ class _AboutScreenState extends State<AboutScreen> {
                       style: TextStyle(
                           fontSize: 15,
                           color: Colors.black.withValues(alpha: 0.4))),
+                  const SizedBox(height: 4),
+                  Text('Picture artwork: Google Noto Emoji (Apache 2.0)',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.black.withValues(alpha: 0.35))),
                 ],
               ),
             ),

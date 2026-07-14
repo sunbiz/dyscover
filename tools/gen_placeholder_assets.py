@@ -16,6 +16,10 @@ Requirements (macOS dev machine):
 Real, pre-recorded human voice and real artwork should replace these later;
 gstreamer on the Pi plays any common format, so recordings can be wav/mp3/m4a.
 Re-run this script any time to regenerate; it overwrites in place.
+
+Images: after running this, run tools/fetch_emoji_images.py to replace the
+placeholder letter-tiles with real Noto Emoji artwork for every word that has an
+emoji (all but igloo, xylophone, yak, which keep the tile from here).
 """
 
 import json
