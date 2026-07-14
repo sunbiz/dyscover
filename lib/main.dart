@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -415,49 +416,275 @@ class _LettersScreenState extends State<LettersScreen> {
             if (_stage != null)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                child: GestureDetector(
-                  onTap: () => Audio.play(_stage!.wordAudio),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: const [
-                        BoxShadow(
-                            blurRadius: 20,
-                            color: Colors.black26,
-                            offset: Offset(0, 8)),
-                      ],
+                child: Row(
+                  children: [
+                    // The word card: tap to replay the example word.
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => Audio.play(_stage!.wordAudio),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 28, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: const [
+                              BoxShadow(
+                                  blurRadius: 20,
+                                  color: Colors.black26,
+                                  offset: Offset(0, 8)),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              // Both cases together helps early readers pair them.
+                              Text(
+                                  '${_stage!.label}${_stage!.label.toLowerCase()}',
+                                  style: TextStyle(
+                                      fontSize: 96,
+                                      fontWeight: FontWeight.w900,
+                                      color: _stage!.color)),
+                              const SizedBox(width: 24),
+                              if (_stage!.image.isNotEmpty)
+                                Image.asset('assets/${_stage!.image}',
+                                    height: 160),
+                              const SizedBox(width: 24),
+                              Expanded(
+                                child: Text(_stage!.exampleWord,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontSize: 58,
+                                        fontWeight: FontWeight.w800)),
+                              ),
+                              const SizedBox(width: 20),
+                              Icon(Icons.volume_up_rounded,
+                                  size: 44,
+                                  color: Colors.black.withValues(alpha: 0.4)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Both cases together helps early readers pair them.
-                        Text('${_stage!.label}${_stage!.label.toLowerCase()}',
-                            style: TextStyle(
-                                fontSize: 96,
-                                fontWeight: FontWeight.w900,
-                                color: _stage!.color)),
-                        const SizedBox(width: 24),
-                        if (_stage!.image.isNotEmpty)
-                          Image.asset('assets/${_stage!.image}', height: 160),
-                        const SizedBox(width: 24),
-                        Text(_stage!.exampleWord,
-                            style: const TextStyle(
-                                fontSize: 58, fontWeight: FontWeight.w800)),
-                        const SizedBox(width: 20),
-                        Icon(Icons.volume_up_rounded,
-                            size: 44,
-                            color: Colors.black.withValues(alpha: 0.4)),
-                      ],
+                    const SizedBox(width: 16),
+                    // Trace: open the full-screen tracing canvas for this letter.
+                    TapTile(
+                      color: _stage!.color,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => TraceScreen(_stage!)),
+                      ),
+                      child: const Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 28, vertical: 18),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.gesture_rounded,
+                                size: 64, color: Colors.white),
+                            SizedBox(height: 2),
+                            Text('Trace',
+                                style: TextStyle(
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white)),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
           ],
         ),
       );
+}
+
+/// Full-screen tracing canvas (Release 1, issue #1). The child draws the
+/// letter with a finger over a faint guide glyph. This adds the kinesthetic
+/// (touch + movement) channel the Orton-Gillingham approach calls its most
+/// effective, turning Letters from tap-to-hear into multi-sensory.
+///
+/// Deliberately scoped: accuracy scoring (#3), an animated stroke guide (#2),
+/// and star/voice feedback (#4) arrive in later issues.
+class TraceScreen extends StatefulWidget {
+  final Letter letter;
+  const TraceScreen(this.letter, {super.key});
+
+  @override
+  State<TraceScreen> createState() => _TraceScreenState();
+}
+
+class _TraceScreenState extends State<TraceScreen> {
+  // Each entry is one continuous stroke (finger down until finger up). Keeping
+  // strokes separate stops multi-stroke letters (A, K, T...) from being joined
+  // by a stray line when the finger lifts and starts again.
+  final List<List<Offset>> _strokes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _say(); // hear the letter while tracing it: audio and touch together
+  }
+
+  void _say() =>
+      Audio.sequence([widget.letter.nameAudio, widget.letter.soundAudio]);
+
+  @override
+  Widget build(BuildContext context) {
+    final l = widget.letter;
+    return Scaffold(
+      appBar: _bar(context, 'Trace ${l.label}'),
+      body: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: LayoutBuilder(
+                builder: (context, box) {
+                  // A square writing surface, as large as the space allows.
+                  final side = math.min(box.maxWidth, box.maxHeight) - 24;
+                  return Container(
+                    width: side,
+                    height: side,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: const [
+                        BoxShadow(
+                            blurRadius: 24,
+                            color: Colors.black26,
+                            offset: Offset(0, 10)),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      children: [
+                        // Guide track: the letter to trace, drawn faintly.
+                        Positioned.fill(
+                          child: Padding(
+                            padding: const EdgeInsets.all(28),
+                            child: FittedBox(
+                              fit: BoxFit.contain,
+                              child: Text(
+                                l.label,
+                                style: TextStyle(
+                                  fontSize: 100,
+                                  fontWeight: FontWeight.w900,
+                                  color: l.color.withValues(alpha: 0.20),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Drawing surface: capture the finger path.
+                        Positioned.fill(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onPanStart: (d) => setState(
+                                () => _strokes.add([d.localPosition])),
+                            onPanUpdate: (d) => setState(
+                                () => _strokes.last.add(d.localPosition)),
+                            child: CustomPaint(
+                              painter: _TracePainter(_strokes, l.color),
+                              size: Size.infinite,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _controlButton(
+                  icon: Icons.volume_up_rounded,
+                  label: 'Hear it',
+                  color: kBrand,
+                  onTap: _say,
+                ),
+                const SizedBox(width: 20),
+                _controlButton(
+                  icon: Icons.refresh_rounded,
+                  label: 'Clear',
+                  color: const Color(0xFFE28413),
+                  onTap:
+                      _strokes.isEmpty ? null : () => setState(_strokes.clear),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _controlButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    VoidCallback? onTap,
+  }) =>
+      TapTile(
+        color: onTap == null ? color.withValues(alpha: 0.35) : color,
+        onTap: onTap ?? () {},
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 40, color: Colors.white),
+              const SizedBox(width: 12),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white)),
+            ],
+          ),
+        ),
+      );
+}
+
+/// Paints the child's finger strokes as smooth, rounded colored lines.
+class _TracePainter extends CustomPainter {
+  final List<List<Offset>> strokes;
+  final Color color;
+  const _TracePainter(this.strokes, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final line = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 26
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final dot = Paint()..color = color;
+    for (final stroke in strokes) {
+      if (stroke.isEmpty) continue;
+      if (stroke.length == 1) {
+        // A touch that never moved still leaves a mark where it landed.
+        canvas.drawCircle(stroke.first, 13, dot);
+        continue;
+      }
+      final path = Path()..moveTo(stroke.first.dx, stroke.first.dy);
+      for (var i = 1; i < stroke.length; i++) {
+        path.lineTo(stroke[i].dx, stroke[i].dy);
+      }
+      canvas.drawPath(path, line);
+    }
+  }
+
+  // The stroke list is mutated in place between rebuilds, so always repaint.
+  @override
+  bool shouldRepaint(_TracePainter oldDelegate) => true;
 }
 
 class PicturesScreen extends StatelessWidget {

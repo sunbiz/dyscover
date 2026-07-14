@@ -5,9 +5,27 @@
 // platform audio plugin (unavailable in the widget-test environment).
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:dyscover/main.dart';
+
+/// Silence the audioplayers plugin so tests can tap tiles (which play audio)
+/// without a real platform player. Method calls no-op; the per-player and
+/// global event streams stay open but emit nothing.
+void muteAudio() {
+  final m = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  for (final name in const ['xyz.luan/audioplayers', 'xyz.luan/audioplayers.global']) {
+    m.setMockMethodCallHandler(MethodChannel(name), (_) async => null);
+  }
+  for (final name in const [
+    'xyz.luan/audioplayers/events/main',
+    'xyz.luan/audioplayers.global/events',
+  ]) {
+    m.setMockStreamHandler(EventChannel(name),
+        MockStreamHandler.inline(onListen: (_, __) {}));
+  }
+}
 
 void main() {
   setUpAll(() async {
@@ -67,6 +85,52 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(find.text('Enter grown-up PIN'), findsNothing);
+  });
+
+  testWidgets('Trace opens a canvas and captures a finger stroke',
+      (tester) async {
+    muteAudio();
+    await pumpToHome(tester);
+    await tester.tap(find.text('Letters'));
+    await tester.pumpAndSettle();
+
+    // Select the first letter to reveal the word bar and its Trace button.
+    await tester.tap(find.text('A').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Trace'), findsOneWidget);
+
+    // Open the tracing canvas.
+    await tester.tap(find.text('Trace'));
+    await tester.pumpAndSettle();
+    expect(find.text('Trace A'), findsOneWidget);
+    expect(find.text('Clear'), findsOneWidget);
+
+    // The Clear button starts disabled (dimmed) because nothing is drawn yet.
+    Color clearColor() => tester
+        .widget<TapTile>(
+            find.ancestor(of: find.text('Clear'), matching: find.byType(TapTile)))
+        .color;
+    expect(clearColor().a, closeTo(0.35, 0.02));
+
+    // Drag a finger across the writing surface.
+    final surface = find.byWidgetPredicate((w) =>
+        w is CustomPaint && w.painter.runtimeType.toString() == '_TracePainter');
+    expect(surface, findsOneWidget);
+    final center = tester.getCenter(surface);
+    final gesture = await tester.startGesture(center - const Offset(90, 0));
+    for (var i = 0; i < 3; i++) {
+      await gesture.moveBy(const Offset(60, 0));
+    }
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    // A stroke was captured, so Clear is now enabled (full opacity).
+    expect(clearColor().a, closeTo(1.0, 0.02));
+
+    // Clearing empties the canvas and disables the button again.
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+    expect(clearColor().a, closeTo(0.35, 0.02));
   });
 
   testWidgets('Pictures screen renders the picture set', (tester) async {
