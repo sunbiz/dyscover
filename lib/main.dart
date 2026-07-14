@@ -363,140 +363,48 @@ class _TapTileState extends State<TapTile> {
       );
 }
 
-class LettersScreen extends StatefulWidget {
+class LettersScreen extends StatelessWidget {
   const LettersScreen({super.key});
-
-  @override
-  State<LettersScreen> createState() => _LettersScreenState();
-}
-
-class _LettersScreenState extends State<LettersScreen> {
-  Letter? _stage;
 
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: _bar(context, 'Letters'),
-        body: Column(
-          children: [
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 4,
-                padding: const EdgeInsets.all(20),
-                mainAxisSpacing: 20,
-                crossAxisSpacing: 20,
-                children: content.letters
-                    .map((l) => TapTile(
-                          color: l.color,
-                          selected: _stage?.id == l.id,
-                          onTap: () {
-                            setState(() => _stage = l);
-                            Audio.sequence([l.nameAudio, l.soundAudio]);
-                          },
-                          // Fill the tile: the letter scales up to the card,
-                          // leaving only a small margin.
-                          child: SizedBox.expand(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: FittedBox(
-                                fit: BoxFit.contain,
-                                child: Text(
-                                  l.label,
-                                  style: const TextStyle(
-                                      fontSize: 100,
-                                      fontWeight: FontWeight.w900,
-                                      color: Colors.white),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ))
-                    .toList(),
-              ),
-            ),
-            if (_stage != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-                child: Row(
-                  children: [
-                    // The word card: tap to replay the example word.
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => Audio.play(_stage!.wordAudio),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 28, vertical: 14),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(28),
-                            boxShadow: const [
-                              BoxShadow(
-                                  blurRadius: 20,
-                                  color: Colors.black26,
-                                  offset: Offset(0, 8)),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              // Both cases together helps early readers pair them.
-                              Text(
-                                  '${_stage!.label}${_stage!.label.toLowerCase()}',
-                                  style: TextStyle(
-                                      fontSize: 96,
-                                      fontWeight: FontWeight.w900,
-                                      color: _stage!.color)),
-                              const SizedBox(width: 24),
-                              if (_stage!.image.isNotEmpty)
-                                Image.asset('assets/${_stage!.image}',
-                                    height: 160),
-                              const SizedBox(width: 24),
-                              Expanded(
-                                child: Text(_stage!.exampleWord,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        fontSize: 58,
-                                        fontWeight: FontWeight.w800)),
-                              ),
-                              const SizedBox(width: 20),
-                              Icon(Icons.volume_up_rounded,
-                                  size: 44,
-                                  color: Colors.black.withValues(alpha: 0.4)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // Trace: open the full-screen tracing canvas for this letter.
-                    TapTile(
-                      color: _stage!.color,
-                      onTap: () => Navigator.push(
+        body: GridView.count(
+          crossAxisCount: 4,
+          padding: const EdgeInsets.all(20),
+          mainAxisSpacing: 20,
+          crossAxisSpacing: 20,
+          children: content.letters
+              .map((l) => TapTile(
+                    color: l.color,
+                    // Speak the letter, then open the tracing canvas. The audio
+                    // keeps playing across the transition (one shared player).
+                    onTap: () {
+                      Audio.sequence([l.nameAudio, l.soundAudio]);
+                      Navigator.push(
                         context,
-                        MaterialPageRoute(
-                            builder: (_) => TraceScreen(_stage!)),
-                      ),
-                      child: const Padding(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 28, vertical: 18),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.gesture_rounded,
-                                size: 64, color: Colors.white),
-                            SizedBox(height: 2),
-                            Text('Trace',
-                                style: TextStyle(
-                                    fontSize: 30,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white)),
-                          ],
+                        MaterialPageRoute(builder: (_) => TraceScreen(l)),
+                      );
+                    },
+                    // Fill the tile: the letter scales up to the card, leaving
+                    // only a small margin.
+                    child: SizedBox.expand(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          child: Text(
+                            l.label,
+                            style: const TextStyle(
+                                fontSize: 100,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white),
+                          ),
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-          ],
+                  ))
+              .toList(),
         ),
       );
 }
@@ -505,6 +413,10 @@ class _LettersScreenState extends State<LettersScreen> {
 /// letter with a finger over a faint guide glyph. This adds the kinesthetic
 /// (touch + movement) channel the Orton-Gillingham approach calls its most
 /// effective, turning Letters from tap-to-hear into multi-sensory.
+///
+/// Reached by tapping a letter (which speaks it first). The screen shows the
+/// example word (tap to hear it) and a "Hear it" button that replays the
+/// letter, so audio and touch stay together while tracing.
 ///
 /// Deliberately scoped: accuracy scoring (#3), an animated stroke guide (#2),
 /// and star/voice feedback (#4) arrive in later issues.
@@ -522,12 +434,6 @@ class _TraceScreenState extends State<TraceScreen> {
   // by a stray line when the finger lifts and starts again.
   final List<List<Offset>> _strokes = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _say(); // hear the letter while tracing it: audio and touch together
-  }
-
   void _say() =>
       Audio.sequence([widget.letter.nameAudio, widget.letter.soundAudio]);
 
@@ -538,6 +444,7 @@ class _TraceScreenState extends State<TraceScreen> {
       appBar: _bar(context, 'Trace ${l.label}'),
       body: Column(
         children: [
+          if (l.exampleWord.isNotEmpty) _wordCard(l),
           Expanded(
             child: Center(
               child: LayoutBuilder(
@@ -624,6 +531,51 @@ class _TraceScreenState extends State<TraceScreen> {
       ),
     );
   }
+
+  // Shows the letter pair and its example word; tap to hear the word spoken.
+  Widget _wordCard(Letter l) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+        child: Center(
+          child: GestureDetector(
+            onTap: () => Audio.play(l.wordAudio),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: const [
+                  BoxShadow(
+                      blurRadius: 14,
+                      color: Colors.black12,
+                      offset: Offset(0, 4)),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Both cases together helps early readers pair them.
+                  Text('${l.label}${l.label.toLowerCase()}',
+                      style: TextStyle(
+                          fontSize: 44,
+                          fontWeight: FontWeight.w900,
+                          color: l.color)),
+                  const SizedBox(width: 16),
+                  if (l.image.isNotEmpty)
+                    Image.asset('assets/${l.image}', height: 64),
+                  const SizedBox(width: 16),
+                  Text(l.exampleWord,
+                      style: const TextStyle(
+                          fontSize: 32, fontWeight: FontWeight.w800)),
+                  const SizedBox(width: 14),
+                  Icon(Icons.volume_up_rounded,
+                      size: 32, color: Colors.black.withValues(alpha: 0.4)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 
   Widget _controlButton({
     required IconData icon,

@@ -87,23 +87,21 @@ void main() {
     expect(find.text('Enter grown-up PIN'), findsNothing);
   });
 
-  testWidgets('Trace opens a canvas and captures a finger stroke',
+  testWidgets('Tapping a letter opens the trace canvas and captures a stroke',
       (tester) async {
     muteAudio();
     await pumpToHome(tester);
     await tester.tap(find.text('Letters'));
     await tester.pumpAndSettle();
 
-    // Select the first letter to reveal the word bar and its Trace button.
+    // Tapping a letter speaks it and opens the tracing canvas directly.
     await tester.tap(find.text('A').first);
-    await tester.pumpAndSettle();
-    expect(find.text('Trace'), findsOneWidget);
-
-    // Open the tracing canvas.
-    await tester.tap(find.text('Trace'));
     await tester.pumpAndSettle();
     expect(find.text('Trace A'), findsOneWidget);
     expect(find.text('Clear'), findsOneWidget);
+    // The letter can be replayed, and the example word is shown to hear too.
+    expect(find.text('Hear it'), findsOneWidget);
+    expect(find.text('Apple'), findsOneWidget);
 
     // The Clear button starts disabled (dimmed) because nothing is drawn yet.
     Color clearColor() => tester
